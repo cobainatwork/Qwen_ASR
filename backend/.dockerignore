@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# 測試與快取
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.hypothesis/
+
+# 套件建構
+*.egg-info/
+*.egg
+build/
+dist/
+wheels/
+
+# IDE 與 OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 本地環境
+.env
+.env.local
+.env.*.local
+
+# 文件（不需進映像）
+*.md
+docs/
+tests/
+fixtures/
+
+# Docker 本身
+Dockerfile
+.dockerignore
+
+# 模型權重（必須透過 volume 掛載）
+models/
+checkpoints/
+*.pt
+*.pth
+*.safetensors
+*.bin
