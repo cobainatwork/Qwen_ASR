@@ -10,6 +10,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:-qwen_asr}
       PGDATA: /var/lib/postgresql/data/pgdata
+    # M1 開發階段暴露 host port 供本機 psql 除錯；production 應透過 docker-compose.override.yml 移除
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -35,7 +36,7 @@ services:
       # 必填
       API_KEY: ${API_KEY:?API_KEY is required}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://qwasr:${DB_PASSWORD}@postgres:5432/qwen_asr}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       THIRD_PARTY_LICENSE_ACK: ${THIRD_PARTY_LICENSE_ACK:?must be true to start}
       ENV: ${ENV:-development}
       DEPLOYMENT_PROFILE: ${DEPLOYMENT_PROFILE:-client}
@@ -67,7 +68,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-false}
       OPENAPI_DOCS_ENABLED: ${OPENAPI_DOCS_ENABLED:-true}
-      OPENAPI_DOCS_REQUIRE_AUTH: ${OPENAPI_DOCS_REQUIRE_AUTH:-false}
+      OPENAPI_DOCS_REQUIRE_AUTH: ${OPENAPI_DOCS_REQUIRE_AUTH:-false}  # production 必須設為 true 以保護 API schema
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
