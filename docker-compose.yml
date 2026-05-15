@@ -1,0 +1,91 @@
+services:
+  postgres:
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
+    image: qwen-asr-postgres:dev
+    container_name: qwen-asr-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-qwasr}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-qwen_asr}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-qwasr} -d ${POSTGRES_DB:-qwen_asr}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  asr-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        INSTALL_GPU_DEPS: ${INSTALL_GPU_DEPS:-false}
+    image: qwen-asr-backend:dev
+    container_name: qwen-asr-backend
+    environment:
+      # 必填
+      API_KEY: ${API_KEY:?API_KEY is required}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://qwasr:${DB_PASSWORD}@postgres:5432/qwen_asr}
+      DB_PASSWORD: ${DB_PASSWORD}
+      THIRD_PARTY_LICENSE_ACK: ${THIRD_PARTY_LICENSE_ACK:?must be true to start}
+      ENV: ${ENV:-development}
+      DEPLOYMENT_PROFILE: ${DEPLOYMENT_PROFILE:-client}
+      # 模型與 vLLM
+      ASR_MODEL: ${ASR_MODEL:-Qwen/Qwen3-ASR-1.7B}
+      MODEL_CACHE_DIR: /data/models
+      BACKEND_TYPE: vllm
+      VLLM_GPU_MEMORY_UTILIZATION: ${VLLM_GPU_MEMORY_UTILIZATION:-0.5}
+      GPU_DEVICE: ${GPU_DEVICE:-cuda:0}
+      MAX_INFERENCE_BATCH: ${MAX_INFERENCE_BATCH:-32}
+      ASR_MAX_TOKENS: ${ASR_MAX_TOKENS:-4096}
+      ASR_REQUEST_TIMEOUT_SEC: ${ASR_REQUEST_TIMEOUT_SEC:-1200}
+      ASR_AUDIO_MAX_DURATION_SEC: ${ASR_AUDIO_MAX_DURATION_SEC:-1200}
+      # 音檔處理
+      AUDIO_STORAGE_DIR: /data/audio
+      VAD_ENABLED: ${VAD_ENABLED:-true}
+      VAD_MODEL_PATH: /data/models/FireRedVAD/model.bin
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-100}
+      MAX_DECODE_SIZE_MB: ${MAX_DECODE_SIZE_MB:-500}
+      SUPPORTED_AUDIO_FORMATS: ${SUPPORTED_AUDIO_FORMATS:-wav,mp3,mp4,flac,aac,ogg,m4a}
+      # 佇列
+      QUEUE_BATCH_MAX_SIZE: ${QUEUE_BATCH_MAX_SIZE:-20}
+      QUEUE_REALTIME_MAX_SIZE: ${QUEUE_REALTIME_MAX_SIZE:-50}
+      QUEUE_REJECT_BEHAVIOR: ${QUEUE_REJECT_BEHAVIOR:-reject}
+      # 可觀測性
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      # 安全與 CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-false}
+      OPENAPI_DOCS_ENABLED: ${OPENAPI_DOCS_ENABLED:-true}
+      OPENAPI_DOCS_REQUIRE_AUTH: ${OPENAPI_DOCS_REQUIRE_AUTH:-false}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ${MODEL_CACHE_DIR_HOST:-./.data/models}:/data/models
+      - ${AUDIO_STORAGE_DIR_HOST:-./.data/audio}:/data/audio
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # GPU runtime（部署環境取消註解；M1 不啟用）
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  pgdata:
+    name: qwen-asr-pgdata
