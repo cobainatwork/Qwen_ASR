@@ -28,13 +28,13 @@ ARG INSTALL_GPU_DEPS=false
 
 WORKDIR /build
 COPY pyproject.toml ./
+# pip install -e "." 需要 app/__init__.py 存在才能解析 package 邊界
 COPY app/__init__.py app/__init__.py
 
-# 安裝 wheel 並建立隔離 venv
-RUN python -m venv /opt/venv
+# 建立隔離 venv 並升級基礎工具
+RUN python -m venv /opt/venv && \
+    /opt/venv/bin/pip install --upgrade pip wheel setuptools
 ENV PATH="/opt/venv/bin:$PATH"
-
-RUN pip install --upgrade pip wheel setuptools
 
 # 條件式安裝 GPU 依賴
 RUN if [ "$INSTALL_GPU_DEPS" = "true" ]; then \
