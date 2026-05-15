@@ -29,7 +29,7 @@ RUN wget -qO /tmp/scws.tar.gz \
     && rm -rf /tmp/scws-1.2.3 /tmp/scws.tar.gz
 
 # 編譯 zhparser
-RUN git clone --depth 1 https://github.com/amutu/zhparser.git /tmp/zhparser \
+RUN git clone --depth 1 --branch v2.3 https://github.com/amutu/zhparser.git /tmp/zhparser \
     && cd /tmp/zhparser \
     && make \
     && make install \
@@ -38,7 +38,6 @@ RUN git clone --depth 1 https://github.com/amutu/zhparser.git /tmp/zhparser \
 
 # 移除建構工具（縮小映像）
 RUN apt-get purge -y --auto-remove build-essential postgresql-server-dev-16 autoconf automake libtool git wget \
-    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # 初始化腳本（容器首次啟動執行）
