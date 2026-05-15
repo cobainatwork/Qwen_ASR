@@ -1,0 +1,195 @@
+# ============================================================
+# Qwen3-ASR 離線語音辨識平台
+# ============================================================
+
+# ------------------------------------------------------------
+# 環境變數與機密
+# ------------------------------------------------------------
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+# 保留範例檔（實作後建立）
+!.env.example
+!.env.sample
+
+# 加密金鑰與憑證
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+.secrets/
+
+# ------------------------------------------------------------
+# Python 後端
+# ------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 虛擬環境
+venv/
+.venv/
+env/
+ENV/
+
+# 套件建構
+*.egg-info/
+*.egg
+build/
+dist/
+wheels/
+
+# 測試與型別檢查快取
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# Alembic 遷移檔的快取（保留 versions/ 本體）
+backend/alembic/versions/__pycache__/
+
+# ------------------------------------------------------------
+# Node.js / Next.js 前端
+# ------------------------------------------------------------
+node_modules/
+.pnp/
+.pnp.js
+.yarn/install-state.gz
+
+# Next.js 建構產出
+.next/
+out/
+next-env.d.ts
+
+# 測試覆蓋
+frontend/coverage/
+
+# Turbopack
+.turbo/
+
+# TypeScript 增量編譯
+*.tsbuildinfo
+
+# Lint / 格式化快取
+.eslintcache
+.prettiercache
+
+# 套件管理 log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ------------------------------------------------------------
+# Docker / 部署
+# ------------------------------------------------------------
+# 本機掛載的資料目錄
+postgres_data/
+pgdata/
+redis_data/
+data/
+
+# 容器 override（個人開發機用）
+docker-compose.override.yml
+docker-compose.*.local.yml
+
+# ------------------------------------------------------------
+# 模型權重（規格書 ML-10 / P0-DEVOPS-2 要求 volume 掛載，不打包）
+# ------------------------------------------------------------
+models/
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+*.onnx
+*.gguf
+
+# 資料集
+datasets/
+*.tar.gz
+*.zip
+*.7z
+
+# ------------------------------------------------------------
+# 音檔與上傳暫存
+# ------------------------------------------------------------
+uploads/
+tmp/
+temp/
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.aac
+*.opus
+*.mp4
+*.webm
+*.mkv
+
+# 保留測試 fixture（實作測試時建立）
+!backend/tests/fixtures/**/*.wav
+!backend/tests/fixtures/**/*.mp3
+!backend/tests/fixtures/**/*.flac
+
+# ------------------------------------------------------------
+# 日誌與監控
+# ------------------------------------------------------------
+logs/
+*.log
+*.log.*
+
+# Prometheus / OpenTelemetry 本地匯出
+metrics/
+traces/
+
+# ------------------------------------------------------------
+# Claude Code 與 AI 工具
+# ------------------------------------------------------------
+.claude/settings.local.json
+.claude/*.local.*
+CLAUDE.local.md
+
+# ------------------------------------------------------------
+# IDE / 編輯器
+# ------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# ------------------------------------------------------------
+# 作業系統
+# ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+*.tmp
+~$*
+
+# ------------------------------------------------------------
+# 規格文件擴充過程暫存
+# ------------------------------------------------------------
+docs/superpowers/specs/_append_*
+docs/superpowers/specs/*_draft.md
+docs/superpowers/specs/*_wip.md
