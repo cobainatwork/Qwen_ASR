@@ -134,8 +134,12 @@ def _configure_app(settings: Settings) -> FastAPI:
     app.include_router(dataset_router)
 
     if settings.DEPLOYMENT_PROFILE == "vendor":
+        from app.routers.correction import router as correction_router
         from app.routers.finetune import router as finetune_router
+        from app.routers.youtube import router as youtube_router
         app.include_router(finetune_router)
+        app.include_router(youtube_router)
+        app.include_router(correction_router)
 
     return app
 
