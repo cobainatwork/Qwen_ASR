@@ -207,6 +207,31 @@ class CorrectionLlmUnavailableError(AppException):
     message = "LLM 糾錯模型未載入"
 
 
+# ----- Phase 2 / M8 -----
+class FinetuneConcurrentError(AppException):
+    code = "FINETUNE_CONCURRENT"
+    http_status = 409
+    message = "已有 Fine-tune 任務在執行（FINETUNE_MAX_CONCURRENT=1）"
+
+
+class FinetuneTaskNotFoundError(AppException):
+    code = "FINETUNE_TASK_NOT_FOUND"
+    http_status = 404
+    message = "Fine-tune 任務不存在"
+
+
+class FinetuneCheckpointNotFoundError(AppException):
+    code = "FINETUNE_CHECKPOINT_NOT_FOUND"
+    http_status = 404
+    message = "Checkpoint 不存在"
+
+
+class FinetunePromoteFailedError(AppException):
+    code = "FINETUNE_PROMOTE_FAILED"
+    http_status = 500
+    message = "Checkpoint promote 失敗"
+
+
 # 完整錯誤碼清單（用於 OpenAPI 文件與測試自動化）
 ALL_ERROR_CODES: tuple[str, ...] = (
     "INTERNAL_ERROR",
@@ -239,4 +264,8 @@ ALL_ERROR_CODES: tuple[str, ...] = (
     "DIARIZATION_FAILED",
     "DIARIZATION_NOT_READY",
     "CORRECTION_LLM_UNAVAILABLE",
+    "FINETUNE_CONCURRENT",
+    "FINETUNE_TASK_NOT_FOUND",
+    "FINETUNE_CHECKPOINT_NOT_FOUND",
+    "FINETUNE_PROMOTE_FAILED",
 )
