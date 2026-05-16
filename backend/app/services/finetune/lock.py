@@ -1,12 +1,14 @@
-"""Fine-tune file lock 機制（M8 完整實作，M7 先建以支援推理降級判斷）。
+"""Fine-tune file lock 機制。
 
 規格 §18.2：Fine-tune 進行時推理服務必須降級。
 """
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
+from typing import Any
 
 import structlog
 
@@ -23,13 +25,24 @@ def is_finetune_active(settings: Settings) -> bool:
     return get_lock_path(settings).exists()
 
 
-def acquire_lock(settings: Settings) -> None:
+def acquire_lock(settings: Settings, task_id: int | None = None) -> None:
     path = get_lock_path(settings)
     if path.exists():
         raise RuntimeError(f"Finetune lock already exists: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(os.getpid()))
-    logger.info("finetune lock acquired", path=str(path), pid=os.getpid())
+    content = {"pid": os.getpid(), "task_id": task_id}
+    path.write_text(json.dumps(content))
+    logger.info("finetune lock acquired", path=str(path), task_id=task_id, pid=os.getpid())
+
+
+def read_lock(settings: Settings) -> dict[str, Any] | None:
+    path = get_lock_path(settings)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())  # type: ignore[no-any-return]
+    except json.JSONDecodeError:
+        return {"pid": path.read_text().strip(), "task_id": None}
 
 
 def release_lock(settings: Settings) -> None:
