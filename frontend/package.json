@@ -36,6 +36,7 @@
     "openapi-typescript": "7.4.1",
     "postcss": "8.4.47",
     "tailwindcss": "3.4.13",
+    "ts-node": "^10.9.2",
     "tsx": "4.19.1",
     "typescript": "5.6.2"
   }
