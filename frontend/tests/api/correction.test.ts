@@ -87,7 +87,7 @@ describe('CorrectionApi.updateSegment', () => {
     expect(headers['Authorization']).toBe('Bearer test-token');
   });
 
-  it('伺服器回傳 success=false 時拋出 CorrectionApiError', async () => {
+  it('伺服器回傳 success=false 時拋出 CorrectionApiError，並帶 code 與 status', async () => {
     mockFetch.mockResolvedValueOnce({
       status: 409,
       json: async () => ({
@@ -97,9 +97,67 @@ describe('CorrectionApi.updateSegment', () => {
       }),
     } as unknown as Response);
 
-    await expect(
-      api.updateSegment(1, 7, { corrected_text: '新文字', expected_version: 0 }),
-    ).rejects.toBeInstanceOf(CorrectionApiError);
+    try {
+      await api.updateSegment(1, 7, { corrected_text: '新文字', expected_version: 0 });
+      fail('應拋出例外');
+    } catch (err) {
+      expect(err).toBeInstanceOf(CorrectionApiError);
+      expect((err as CorrectionApiError).code).toBe('CORRECTION_VERSION_MISMATCH');
+      expect((err as CorrectionApiError).status).toBe(409);
+    }
+  });
+});
+
+describe('CorrectionApi.getSession', () => {
+  let api: CorrectionApi;
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    api = new CorrectionApi({ baseUrl: '', getToken: () => null });
+  });
+
+  it('正確呼叫 GET /sessions/:id 並回傳 session', async () => {
+    mockFetch.mockResolvedValueOnce(makeMockResponse({
+      id: 1,
+      transcription_id: 10,
+      name: 'sess',
+      status: 'in_progress',
+      created_at: '2026-05-17T00:00:00Z',
+      updated_at: '2026-05-17T00:00:00Z',
+    }));
+    const session = await api.getSession(1);
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/correction/sessions/1',
+      expect.objectContaining({ method: 'GET' }),
+    );
+    expect(session.name).toBe('sess');
+  });
+});
+
+describe('CorrectionApi.listSegments', () => {
+  let api: CorrectionApi;
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    api = new CorrectionApi({ baseUrl: '', getToken: () => null });
+  });
+
+  it('正確呼叫 GET /sessions/:id/segments 並回傳 array', async () => {
+    mockFetch.mockResolvedValueOnce(makeMockResponse([
+      {
+        id: 1, session_id: 1, segment_index: 0,
+        start_sec: 0, end_sec: 5,
+        original_text: 'a', corrected_text: null, version: 1,
+        updated_at: '2026-05-17T00:00:00Z',
+      },
+    ]));
+    const segments = await api.listSegments(1);
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/correction/sessions/1/segments',
+      expect.objectContaining({ method: 'GET' }),
+    );
+    expect(segments).toHaveLength(1);
+    expect(segments[0].segment_index).toBe(0);
   });
 });
 

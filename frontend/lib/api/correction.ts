@@ -1,5 +1,7 @@
 import type { ResponseEnvelope } from './types';
 
+const DEFAULT_TIMEOUT_MS = 1_200_000; // 對齊 M6 client.ts ASR_REQUEST_TIMEOUT_SEC
+
 // ─── 型別定義（對齊 app/schemas/correction.py 1:1）────────────────────────────
 
 export interface CorrectionSession {
@@ -127,22 +129,30 @@ export class CorrectionApi {
 
   private async request<T>(path: string, init: RequestInit): Promise<T> {
     const token = this.getToken();
-    const resp = await fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(init.headers ?? {}),
-      },
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
-    const json: ResponseEnvelope<T> = await resp.json();
-    if (!json.success || json.data === null) {
-      throw new CorrectionApiError(
-        json.error?.code ?? 'UNKNOWN',
-        json.error?.message ?? '請求失敗',
-        resp.status,
-      );
+    try {
+      const resp = await fetch(`${this.baseUrl}${path}`, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(init.headers ?? {}),
+        },
+      });
+
+      const json: ResponseEnvelope<T> = await resp.json();
+      if (!json.success || json.data === null) {
+        throw new CorrectionApiError(
+          json.error?.code ?? 'UNKNOWN',
+          json.error?.message ?? '請求失敗',
+          resp.status,
+        );
+      }
+      return json.data;
+    } finally {
+      clearTimeout(timer);
     }
-    return json.data;
   }
 }

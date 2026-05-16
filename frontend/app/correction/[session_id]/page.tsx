@@ -69,16 +69,19 @@ export default function CorrectionWorkbenchPage() {
     text: string,
     expectedVersion: number,
   ) {
-    // Optimistic update：先以本地版本替換畫面
-    const updated = await api.updateSegment(sessionId, segmentId, {
-      corrected_text: text,
-      expected_version: expectedVersion,
-    });
-    // 以最新版本取代本地狀態，避免二次衝突
-    setSegments((prev) =>
-      prev.map((seg) => (seg.id === segmentId ? updated : seg)),
-    );
-    // 與後端同步確保 version 正確（避免下次儲存 version 不一致）
+    try {
+      await api.updateSegment(sessionId, segmentId, {
+        corrected_text: text,
+        expected_version: expectedVersion,
+      });
+    } catch (err) {
+      // 版本衝突：提供明確使用者提示
+      if (err instanceof CorrectionApiError && err.code === 'CORRECTION_VERSION_MISMATCH') {
+        throw new Error('版本衝突：他人已修改此段落，請重新整理後再試');
+      }
+      throw err;
+    }
+    // reload 是唯一 source of truth；不做 optimistic setSegments
     await reload();
   }
 
@@ -190,7 +193,7 @@ export default function CorrectionWorkbenchPage() {
         )}
         {segments.map((seg) => (
           <SegmentEditor
-            key={seg.id}
+            key={`${seg.id}-${seg.version}`}
             segment={seg}
             onSave={handleSaveSegment}
           />
