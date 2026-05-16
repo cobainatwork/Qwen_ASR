@@ -175,6 +175,11 @@ traces/
 CLAUDE.md
 CLAUDE.local.md
 
+# 內部設計與審查文件（不公開）
+docs/
+multi-angle-review-report.md
+spec-review-report.md
+
 # ------------------------------------------------------------
 # IDE / 編輯器
 # ------------------------------------------------------------
