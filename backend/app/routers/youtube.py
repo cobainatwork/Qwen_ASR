@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -48,12 +50,14 @@ async def _execute_download(
         record = repo.get(download_id)
         if record is None:
             return
+        audio_path_to_cleanup: Path | None = None
         try:
             record.status = "downloading"
             db.commit()
             result = await download_audio(
                 url, settings.AUDIO_STORAGE_DIR / "youtube", settings
             )
+            audio_path_to_cleanup = result.audio_path
             raw = result.audio_path.read_bytes()
             audio = store_upload(
                 db=db,
@@ -64,6 +68,8 @@ async def _execute_download(
                 verified_mime="audio/wav",
                 storage_dir=settings.AUDIO_STORAGE_DIR / "youtube_stored",
             )
+            # store_upload 完成後所有權已轉移，不再由本函式負責清理
+            audio_path_to_cleanup = None
             AudioFileRepository(db, api_key_id).update_after_resample(
                 audio.id,
                 original_sample_rate=16000,
@@ -79,6 +85,8 @@ async def _execute_download(
             record.status = "failed"
             record.error_message = str(e)[:1000]
             db.commit()
+            if audio_path_to_cleanup is not None:
+                audio_path_to_cleanup.unlink(missing_ok=True)
 
 
 @router.post(

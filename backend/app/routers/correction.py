@@ -99,6 +99,17 @@ def update_segment(
         raise CorrectionSessionNotFoundError(details={"session_id": session_id})
 
     seg_repo = CorrectionSegmentRepository(db, api_key.id)
+    # 驗證 segment 屬於本 session，避免同 tenant 內跨 session 越權
+    existing = seg_repo.get(segment_id)
+    if existing is None or existing.session_id != session_id:
+        raise CorrectionSessionNotFoundError(
+            details={
+                "session_id": session_id,
+                "segment_id": segment_id,
+                "reason": "segment_not_in_session",
+            },
+        )
+
     updated = seg_repo.update_with_version(
         segment_id,
         expected_version=payload.expected_version,
