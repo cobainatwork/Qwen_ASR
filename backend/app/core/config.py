@@ -62,6 +62,26 @@ class Settings(BaseSettings):
     HOTWORD_SHALLOW_FUSION_THRESHOLD: int = 100
     HOTWORD_CTC_WS_THRESHOLD: int = 1000
 
+    # ----- Phase 2 / M7 -----
+    ALIGNER_ENABLED: bool = True
+    ALIGNER_MODEL_PATH: Path = Path("/data/models/Qwen3-ForcedAligner-0.6B")
+    ALIGNER_MAX_DURATION_SEC: int = 300  # 5 分鐘
+
+    DIARIZATION_ENABLED: bool = True
+    DIARIZATION_BACKEND: Literal["pyannote", "campp"] = "pyannote"
+
+    POST_PROCESSING_ENABLED: bool = True
+
+    CORRECTION_NEC_ENABLED: bool = False
+    CORRECTION_KENLM_ENABLED: bool = False
+    CORRECTION_KENLM_MODEL_PATH: Path | None = None
+    CORRECTION_HOMOPHONE_ENABLED: bool = False
+    CORRECTION_LLM_BACKEND: Literal["none", "local", "openai"] = "none"
+
+    HF_TOKEN: str | None = None  # pyannote 載入需要
+
+    FINETUNE_LOCK_PATH: Path = Path("/data/finetune.lock")
+
     # ----- 補充：認證查找用 HMAC 密鑰 -----
     # 注意：Phase 1 暫以 API_KEY 衍生 HMAC 密鑰；正式部署應獨立提供
     LOOKUP_HMAC_KEY: str | None = None

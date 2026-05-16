@@ -170,6 +170,43 @@ class DatasetSampleInvalidError(AppException):
     message = "樣本資料不符規範"
 
 
+# ----- Phase 2 / M7 -----
+class AlignerNotReadyError(AppException):
+    code = "ALIGNER_NOT_READY"
+    http_status = 503
+    message = "ForcedAligner 模組尚未就緒"
+
+
+class AlignerAudioTooLongError(AppException):
+    code = "ALIGNER_AUDIO_TOO_LONG"
+    http_status = 413
+    message = "音檔長度超過 ForcedAligner 5 分鐘上限"
+
+
+class AlignerFailedError(AppException):
+    code = "ALIGNER_FAILED"
+    http_status = 500
+    message = "對齊失敗（已寫入 post_processing.aligner_failed）"
+
+
+class DiarizationFailedError(AppException):
+    code = "DIARIZATION_FAILED"
+    http_status = 500
+    message = "語者分離失敗"
+
+
+class DiarizationNotReadyError(AppException):
+    code = "DIARIZATION_NOT_READY"
+    http_status = 503
+    message = "語者分離模組尚未就緒"
+
+
+class CorrectionLlmUnavailableError(AppException):
+    code = "CORRECTION_LLM_UNAVAILABLE"
+    http_status = 503
+    message = "LLM 糾錯模型未載入"
+
+
 # 完整錯誤碼清單（用於 OpenAPI 文件與測試自動化）
 ALL_ERROR_CODES: tuple[str, ...] = (
     "INTERNAL_ERROR",
@@ -196,4 +233,10 @@ ALL_ERROR_CODES: tuple[str, ...] = (
     "HOTWORD_TOO_LARGE",
     "DATASET_NOT_FOUND",
     "DATASET_SAMPLE_INVALID",
+    "ALIGNER_NOT_READY",
+    "ALIGNER_AUDIO_TOO_LONG",
+    "ALIGNER_FAILED",
+    "DIARIZATION_FAILED",
+    "DIARIZATION_NOT_READY",
+    "CORRECTION_LLM_UNAVAILABLE",
 )
