@@ -70,6 +70,8 @@ ignore = [
   "S101",     # pytest 內使用 assert
   "RUF001",   # 中文字串內全形標點（繁體中文專案合理排除）
   "RUF003",   # 中文註解內全形標點（繁體中文專案合理排除）
+  "UP046",    # Pydantic BaseModel 尚不支援 PEP 695 新式 Generic 語法
+  "UP047",    # 同上，Generic 函式暫保留 TypeVar 寫法
 ]
 
 [tool.ruff.lint.per-file-ignores]
