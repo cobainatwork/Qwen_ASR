@@ -360,24 +360,39 @@ mkdir postgres
 
 撰寫 `postgres/Dockerfile`：
 
+> **規格瑕疵修正紀錄（PHASE1-SPEC-04）**：原版引用 `libscws3` / `libscws-dev` 在 Debian Bookworm 的 apt 倉庫中**不存在**（此套件僅在 Debian Buster/Bullseye 時代存在）。修正方式：從 SCWS 1.2.3 GitHub tarball 編譯安裝，並加入 `autoconf / automake / libtool / wget` 工具鏈。zhparser 同步以 `--branch v2.3` 固定版本，避免 upstream 漂移。multi-stage 重構（PHASE1-OPT-02）於 M2 啟動前處理。
+
 ```dockerfile
 # syntax=docker/dockerfile:1.7
 FROM postgres:16-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 安裝建構工具與 zhparser 編譯依賴
+# 安裝建構工具與 SCWS / zhparser 編譯依賴
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         postgresql-server-dev-16 \
-        libscws3 \
-        libscws-dev \
+        autoconf \
+        automake \
+        libtool \
         git \
+        wget \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# 編譯 zhparser
-RUN git clone --depth 1 https://github.com/amutu/zhparser.git /tmp/zhparser \
+# 從原始碼編譯 SCWS 1.2.3（Debian Bookworm 已無 libscws3 / libscws-dev 套件）
+RUN wget -q -O /tmp/scws.tar.gz https://github.com/hightman/scws/archive/refs/tags/1.2.3.tar.gz \
+    && tar -xzf /tmp/scws.tar.gz -C /tmp \
+    && cd /tmp/scws-1.2.3 \
+    && autoreconf -fiv \
+    && ./configure --prefix=/usr/local \
+    && make && make install \
+    && ldconfig \
+    && cd / \
+    && rm -rf /tmp/scws-1.2.3 /tmp/scws.tar.gz
+
+# 編譯 zhparser（pin v2.3 避免 upstream 漂移）
+RUN git clone --depth 1 --branch v2.3 https://github.com/amutu/zhparser.git /tmp/zhparser \
     && cd /tmp/zhparser \
     && make \
     && make install \
@@ -385,8 +400,7 @@ RUN git clone --depth 1 https://github.com/amutu/zhparser.git /tmp/zhparser \
     && rm -rf /tmp/zhparser
 
 # 移除建構工具（縮小映像）
-RUN apt-get purge -y --auto-remove build-essential postgresql-server-dev-16 git \
-    && apt-get autoremove -y \
+RUN apt-get purge -y --auto-remove build-essential postgresql-server-dev-16 autoconf automake libtool git wget \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 # 初始化腳本（容器首次啟動執行）
