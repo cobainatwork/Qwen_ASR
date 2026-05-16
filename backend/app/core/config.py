@@ -58,15 +58,15 @@ class Settings(BaseSettings):
     OPENAPI_DOCS_ENABLED: bool = True
     OPENAPI_DOCS_REQUIRE_AUTH: bool = False
 
-    # ----- 補充: 認證查找用 HMAC 密鑰 -----
-    # 注意: Phase 1 暫以 API_KEY 衍生 HMAC 密鑰; 正式部署應獨立提供
+    # ----- 補充：認證查找用 HMAC 密鑰 -----
+    # 注意：Phase 1 暫以 API_KEY 衍生 HMAC 密鑰；正式部署應獨立提供
     LOOKUP_HMAC_KEY: str | None = None
 
     @field_validator("LOG_FORMAT")
     @classmethod
     def enforce_json_in_phase1(cls, v: str) -> str:
         if v != "json":
-            raise ValueError("Phase 1 強制 LOG_FORMAT=json (CLAUDE.md 規範 20)")
+            raise ValueError("Phase 1 強制 LOG_FORMAT=json（CLAUDE.md 規範 20）")
         return v
 
     @property

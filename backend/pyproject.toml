@@ -67,7 +67,9 @@ select = [
   "RUF",          # ruff-specific
 ]
 ignore = [
-  "S101",  # pytest 內使用 assert
+  "S101",     # pytest 內使用 assert
+  "RUF001",   # 中文字串內全形標點（繁體中文專案合理排除）
+  "RUF003",   # 中文註解內全形標點（繁體中文專案合理排除）
 ]
 
 [tool.ruff.lint.per-file-ignores]
