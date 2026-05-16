@@ -80,6 +80,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S105", "S106", "S108", "S311"]  # 測試中允許 hardcoded password、tmp 路徑、隨機
 "app/deps/*.py" = ["B008"]  # FastAPI Depends/Header 在函式預設值是框架慣用語
+"app/routers/*.py" = ["B008"]  # FastAPI File/Form/Depends 在路由函式預設值是框架慣用語
 
 # ---------------- mypy ----------------
 [tool.mypy]

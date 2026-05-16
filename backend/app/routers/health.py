@@ -17,7 +17,7 @@ def health() -> ResponseEnvelope[HealthData]:
 
 
 @router.get("/readiness", response_model=ResponseEnvelope[ReadinessData])
-def readiness(db: Session = Depends(get_db)) -> ResponseEnvelope[ReadinessData]:  # noqa: B008
+def readiness(db: Session = Depends(get_db)) -> ResponseEnvelope[ReadinessData]:
     checks: dict[str, str] = {}
     try:
         db.execute(text("SELECT 1"))
