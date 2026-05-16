@@ -132,6 +132,11 @@ def _configure_app(settings: Settings) -> FastAPI:
     app.include_router(asr_router)
     app.include_router(hotword_router)
     app.include_router(dataset_router)
+
+    if settings.DEPLOYMENT_PROFILE == "vendor":
+        from app.routers.finetune import router as finetune_router
+        app.include_router(finetune_router)
+
     return app
 
 
