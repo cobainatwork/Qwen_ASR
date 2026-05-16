@@ -77,6 +77,12 @@ next-env.d.ts
 # 測試覆蓋
 frontend/coverage/
 
+# Frontend 子目錄明確排除（與上方全域規則互補）
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+
 # Turbopack
 .turbo/
 
