@@ -110,10 +110,8 @@ docker-compose.*.local.yml
 # ------------------------------------------------------------
 # 模型權重（規格書 ML-10 / P0-DEVOPS-2 要求 volume 掛載，不打包）
 # ------------------------------------------------------------
-models/
-# 例外：backend/app/models/ 為 SQLAlchemy ORM 原始碼，必須納入版控
-!backend/app/models/
-!backend/app/models/**
+/models/
+/data/models/
 checkpoints/
 *.pt
 *.pth
