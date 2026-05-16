@@ -16,7 +16,12 @@ from app.middleware import (
     request_id_middleware,
     tracing_middleware,
 )
+from app.routers.asr import router as asr_router
 from app.routers.health import router as health_router
+from app.services.asr.consumer import AsrConsumer
+from app.services.asr.engine import AsrEngineManager
+from app.services.asr.queue import AsyncioQueueBackend
+from app.services.audio.vad import FireRedVADService
 from app.services.bootstrap import bootstrap_admin_key
 
 
@@ -30,7 +35,38 @@ def _configure_app(settings: Settings) -> FastAPI:
         run_startup_checks(settings)
         with get_session_factory()() as db:
             bootstrap_admin_key(db, settings)
+
+        # 載入 VAD（Phase 1 必載）
+        if settings.VAD_ENABLED:
+            try:
+                FireRedVADService.load(settings.VAD_MODEL_PATH)
+            except RuntimeError as e:
+                if settings.ENV == "production":
+                    raise
+                logger.warning("VAD load failed (development tolerated)", error=str(e))
+
+        # 載入 vLLM
+        try:
+            await AsrEngineManager.initialize(settings)
+        except RuntimeError as e:
+            if settings.ENV == "production":
+                raise
+            logger.warning("vLLM initialize skipped (development)", error=str(e))
+
+        # 啟動 ASR 佇列與 consumer
+        queue = AsyncioQueueBackend(
+            realtime_max=settings.QUEUE_REALTIME_MAX_SIZE,
+            batch_max=settings.QUEUE_BATCH_MAX_SIZE,
+        )
+        app.state.asr_queue = queue
+        consumer = AsrConsumer(queue, max_duration_sec=settings.ASR_AUDIO_MAX_DURATION_SEC)
+        await consumer.start()
+        app.state.asr_consumer = consumer
+
         yield
+
+        await consumer.stop()
+        await AsrEngineManager.shutdown()
         logger.info("backend lifespan stop")
 
     app = FastAPI(
@@ -59,6 +95,7 @@ def _configure_app(settings: Settings) -> FastAPI:
 
     register_exception_handlers(app)
     app.include_router(health_router)
+    app.include_router(asr_router)
     return app
 
 

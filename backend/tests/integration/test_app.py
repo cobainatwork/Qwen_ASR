@@ -68,3 +68,8 @@ def test_request_id_header_propagated(configured_app) -> None:
     with TestClient(configured_app) as client:
         resp = client.get("/health", headers={"X-Request-ID": "req-123"})
     assert resp.headers["X-Request-ID"] == "req-123"
+
+
+def test_asr_route_registered(configured_app) -> None:
+    paths = [route.path for route in configured_app.routes]
+    assert "/api/v1/asr/transcribe" in paths
