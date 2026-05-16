@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint-type:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy app
+
+  test:
+    runs-on: ubuntu-22.04
+    services:
+      docker:
+        image: docker:24-dind
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Build postgres test image
+        working-directory: ${{ github.workspace }}
+        run: docker build -t qwen-asr-postgres:test postgres/
+      - run: pytest -m "not gpu" --cov=app --cov-report=term --cov-fail-under=70
+
+  migration-check:
+    runs-on: ubuntu-22.04
+    services:
+      postgres:
+        image: postgres:16-bookworm
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: qwen_asr_migration_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: 安裝 SCWS 1.2.3 + zhparser v2.3（postgres container 預設 Bookworm 無 libscws-dev）
+        run: |
+          docker exec ${{ job.services.postgres.id }} bash -c "
+            apt-get update && apt-get install -y --no-install-recommends \
+              build-essential postgresql-server-dev-16 autoconf automake libtool git wget ca-certificates && \
+            wget -q -O /tmp/scws.tar.gz https://github.com/hightman/scws/archive/refs/tags/1.2.3.tar.gz && \
+            tar -xzf /tmp/scws.tar.gz -C /tmp && \
+            cd /tmp/scws-1.2.3 && \
+            autoreconf -fiv && \
+            ./configure --prefix=/usr/local && \
+            make && make install && \
+            ldconfig && \
+            git clone --depth 1 --branch v2.3 https://github.com/amutu/zhparser.git /tmp/zhparser && \
+            cd /tmp/zhparser && \
+            make && make install
+          "
+      - name: Alembic round-trip
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:test@localhost:5432/qwen_asr_migration_test
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+  docker-build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend builder stage（skeleton 模式，不含 audio/gpu）
+        run: |
+          docker build --target builder \
+            --build-arg INSTALL_AUDIO_DEPS=false \
+            --build-arg INSTALL_GPU_DEPS=false \
+            -t qwen-asr-backend:builder backend/
+      - name: Build backend runtime stage (CPU skeleton)
+        run: |
+          docker build --target runtime \
+            --build-arg INSTALL_AUDIO_DEPS=false \
+            --build-arg INSTALL_GPU_DEPS=false \
+            -t qwen-asr-backend:test backend/
+
+  api-contract:
+    runs-on: ubuntu-22.04
+    needs: [test]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: 檢查所有 router 是否使用 ResponseEnvelope
+        run: python ../scripts/check_response_envelope.py
