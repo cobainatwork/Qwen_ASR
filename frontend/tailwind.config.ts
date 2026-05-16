@@ -8,6 +8,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // CSS 變數對應（允許 @apply text-foreground / bg-background）
+        foreground: 'var(--foreground)',
+        background: 'var(--background)',
         // Apple Glassmorphism palette
         glass: {
           50: 'rgba(255, 255, 255, 0.6)',
