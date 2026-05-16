@@ -1,25 +1,25 @@
 import type { ResponseEnvelope } from './types';
 
-// ─── 型別定義 ────────────────────────────────────────────────────────────────
+// ─── 型別定義（對齊 app/schemas/correction.py 1:1）────────────────────────────
 
 export interface CorrectionSession {
-  session_id: number;
+  id: number;
   transcription_id: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'exported';
+  name: string;
+  status: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface CorrectionSegment {
-  segment_id: number;
+  id: number;
   session_id: number;
+  segment_index: number;
   start_sec: number;
   end_sec: number;
-  speaker_label: string | null;
   original_text: string;
   corrected_text: string | null;
   version: number;
-  created_at: string;
   updated_at: string;
 }
 
@@ -29,14 +29,12 @@ export interface UpdateSegmentPayload {
 }
 
 export interface ExportToDatasetPayload {
-  dataset_name: string;
-  description?: string;
+  dataset_id: number;
 }
 
 export interface ExportResult {
-  dataset_id: number;
   inserted_count: number;
-  dataset_name: string;
+  dataset_id: number;
 }
 
 // ─── API 用戶端 ───────────────────────────────────────────────────────────────
@@ -90,14 +88,15 @@ export class CorrectionApi {
 
   /**
    * 更新單一校正片段（含 optimistic locking）
-   * PUT /api/v1/correction/segments/{segment_id}
+   * PUT /api/v1/correction/sessions/{session_id}/segments/{segment_id}
    */
   async updateSegment(
+    sessionId: number,
     segmentId: number,
     payload: UpdateSegmentPayload,
   ): Promise<CorrectionSegment> {
     return this.request<CorrectionSegment>(
-      `/api/v1/correction/segments/${segmentId}`,
+      `/api/v1/correction/sessions/${sessionId}/segments/${segmentId}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

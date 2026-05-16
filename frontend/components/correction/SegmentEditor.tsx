@@ -11,9 +11,9 @@ interface SegmentEditorProps {
   segment: CorrectionSegment;
   /**
    * 儲存回呼：由父元件負責呼叫 CorrectionApi.updateSegment
-   * @param segmentId  片段 ID
-   * @param text       校正後文字
-   * @param expectedVersion  目前版本號（用於 optimistic locking）
+   * @param segmentId       片段 ID（segment.id）
+   * @param text            校正後文字
+   * @param expectedVersion 目前版本號（用於 optimistic locking）
    */
   onSave: (segmentId: number, text: string, expectedVersion: number) => Promise<void>;
 }
@@ -35,7 +35,7 @@ export function SegmentEditor({ segment, onSave }: SegmentEditorProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // plan bug 修補：corrected_text 可能為 null，改用 baseline 比較
+  // corrected_text 可能為 null，以 baseline 比較避免誤判
   const isUnchanged = text === baseline;
   const isDisabled = saving || isUnchanged;
 
@@ -43,7 +43,7 @@ export function SegmentEditor({ segment, onSave }: SegmentEditorProps) {
     setSaving(true);
     setError(null);
     try {
-      await onSave(segment.segment_id, text, segment.version);
+      await onSave(segment.id, text, segment.version);
     } catch (err) {
       setError(err instanceof Error ? err.message : '儲存失敗，請重試');
     } finally {
@@ -53,22 +53,20 @@ export function SegmentEditor({ segment, onSave }: SegmentEditorProps) {
 
   return (
     <div className="flex flex-col gap-2 p-4 rounded-xl bg-glass-50 backdrop-blur-sm border border-white/40">
-      {/* 標頭：時間區間 + 語者 + 版本徽章 */}
+      {/* 標頭：索引號 + 時間區間 + 版本徽章 */}
       <div className="flex items-center gap-3 text-sm text-foreground/70">
+        <span className="font-mono font-medium text-foreground/80">
+          [{segment.segment_index + 1}]
+        </span>
         <span className="font-mono">
           {formatSec(segment.start_sec)} → {formatSec(segment.end_sec)}
         </span>
-        {segment.speaker_label && (
-          <span className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-xs font-medium">
-            {segment.speaker_label}
-          </span>
-        )}
         <span className="ml-auto px-2 py-0.5 rounded-full bg-surface text-xs font-mono text-foreground/50">
           v{segment.version}
         </span>
       </div>
 
-      {/* 原文（唯讀參考） */}
+      {/* 原文（唯讀參考，僅在已有校正文字時顯示刪除線） */}
       {segment.corrected_text !== null && (
         <p className="text-xs text-foreground/50 line-through select-none">
           原文：{segment.original_text}

@@ -69,38 +69,42 @@ export default function CorrectionWorkbenchPage() {
     text: string,
     expectedVersion: number,
   ) {
-    const updated = await api.updateSegment(segmentId, {
+    // Optimistic update：先以本地版本替換畫面
+    const updated = await api.updateSegment(sessionId, segmentId, {
       corrected_text: text,
       expected_version: expectedVersion,
     });
     // 以最新版本取代本地狀態，避免二次衝突
     setSegments((prev) =>
-      prev.map((seg) => (seg.segment_id === segmentId ? updated : seg)),
+      prev.map((seg) => (seg.id === segmentId ? updated : seg)),
     );
+    // 與後端同步確保 version 正確（避免下次儲存 version 不一致）
+    await reload();
   }
 
   // ─── 匯出至資料集狀態 ─────────────────────────────────────────────────────
 
-  const [datasetName, setDatasetName] = useState('');
+  const [datasetId, setDatasetId] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportResult, setExportResult] = useState<{
     insertedCount: number;
-    datasetName: string;
+    datasetId: number;
   } | null>(null);
 
   async function handleExport() {
-    if (!datasetName.trim()) return;
+    const parsedId = Number(datasetId);
+    if (!datasetId.trim() || isNaN(parsedId) || parsedId <= 0) return;
     setExporting(true);
     setExportError(null);
     setExportResult(null);
     try {
       const result = await api.exportToDataset(sessionId, {
-        dataset_name: datasetName.trim(),
+        dataset_id: parsedId,
       });
       setExportResult({
         insertedCount: result.inserted_count,
-        datasetName: result.dataset_name,
+        datasetId: result.dataset_id,
       });
     } catch (err) {
       if (err instanceof CorrectionApiError) {
@@ -145,8 +149,11 @@ export default function CorrectionWorkbenchPage() {
             <h1 className="text-xl font-semibold text-foreground">
               校正工作台
             </h1>
+            <h2 className="text-base font-medium text-foreground/80 mt-0.5">
+              {session?.name}
+            </h2>
             <p className="text-sm text-foreground/60 mt-1">
-              工作階段 #{session?.session_id}（轉譯 #{session?.transcription_id}）
+              工作階段 #{session?.id}（轉譯 #{session?.transcription_id}）
             </p>
           </div>
           <span
@@ -160,6 +167,11 @@ export default function CorrectionWorkbenchPage() {
             {session?.status === 'in_progress' && '校正中'}
             {session?.status === 'completed' && '已完成'}
             {session?.status === 'exported' && '已匯出'}
+            {session?.status !== 'pending' &&
+              session?.status !== 'in_progress' &&
+              session?.status !== 'completed' &&
+              session?.status !== 'exported' &&
+              session?.status}
           </span>
         </div>
       </Card>
@@ -178,7 +190,7 @@ export default function CorrectionWorkbenchPage() {
         )}
         {segments.map((seg) => (
           <SegmentEditor
-            key={seg.segment_id}
+            key={seg.id}
             segment={seg}
             onSave={handleSaveSegment}
           />
@@ -193,17 +205,17 @@ export default function CorrectionWorkbenchPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1">
             <Input
-              label="資料集名稱"
-              type="text"
-              value={datasetName}
-              onChange={(e) => setDatasetName(e.target.value)}
-              placeholder="例：production-batch-01"
+              label="匯出至 Dataset ID"
+              type="number"
+              value={datasetId}
+              onChange={(e) => setDatasetId(e.target.value)}
+              placeholder="例：42"
               disabled={exporting}
             />
           </div>
           <Button
             onClick={handleExport}
-            disabled={exporting || !datasetName.trim()}
+            disabled={exporting || !datasetId.trim() || Number(datasetId) <= 0}
             className="shrink-0"
           >
             {exporting ? '匯出中…' : '確認匯出'}
@@ -213,7 +225,7 @@ export default function CorrectionWorkbenchPage() {
         {/* 匯出結果 */}
         {exportResult && (
           <p className="mt-3 text-sm text-green-600">
-            已成功匯出 {exportResult.insertedCount} 筆至資料集「{exportResult.datasetName}」
+            已成功匯出 {exportResult.insertedCount} 筆至資料集 #{exportResult.datasetId}
           </p>
         )}
         {exportError && (
