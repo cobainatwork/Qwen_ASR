@@ -148,6 +148,7 @@ temp/
 !backend/tests/fixtures/**/*.wav
 !backend/tests/fixtures/**/*.mp3
 !backend/tests/fixtures/**/*.flac
+!backend/tests/fixtures/**/*.zip
 
 # ------------------------------------------------------------
 # 日誌與監控
