@@ -55,22 +55,20 @@ def export_session_to_dataset(
     seg_repo = CorrectionSegmentRepository(db, api_key_id)
     segments = seg_repo.list_by_session(session_id)
 
+    audio_storage = Path(audio.storage_path)
+    audio_file_size = audio_storage.stat().st_size if audio_storage.exists() else 0
+
     sample_repo = DatasetSampleRepository(db, api_key_id)
     inserted = 0
     for seg in segments:
         if not seg.corrected_text:
             continue
-        file_size = (
-            Path(audio.storage_path).stat().st_size
-            if Path(audio.storage_path).exists()
-            else 0
-        )
         sample_repo.create(
             dataset_id=dataset_id,
             audio_file_id=audio.id,
             transcript=seg.corrected_text,
             duration_sec=seg.end_sec - seg.start_sec,
-            file_size=file_size,
+            file_size=audio_file_size,
         )
         inserted += 1
 

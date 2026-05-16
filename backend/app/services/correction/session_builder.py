@@ -38,7 +38,6 @@ def build_session_from_transcription(
 
     seg_repo = CorrectionSegmentRepository(db, api_key_id)
     seg_repo.bulk_create(session.id, segments_input)
-    db.flush()
     return session.id
 
 
@@ -66,7 +65,7 @@ def _build_segments(transcription: Transcription) -> list[dict[str, Any]]:
         if current_start is None:
             current_start = start
 
-        if end - current_start > _SEGMENT_DURATION_SEC:
+        if current_words and end - current_start > _SEGMENT_DURATION_SEC:
             segments.append(
                 {
                     "start_sec": current_start,

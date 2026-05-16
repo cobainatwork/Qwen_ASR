@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -35,7 +37,7 @@ class CorrectionSegmentRepository:
             .all()
         )
 
-    def bulk_create(self, session_id: int, segments: list[dict]) -> int:  # type: ignore[type-arg]
+    def bulk_create(self, session_id: int, segments: list[dict[str, Any]]) -> int:
         """批量建立段落，自動編 segment_index。回傳新增數量。"""
         for i, seg in enumerate(segments):
             self.db.add(
@@ -67,6 +69,9 @@ class CorrectionSegmentRepository:
 
         版本不符時拋 CorrectionVersionMismatchError，
         details 包含 expected_version / actual_version 供前端判斷。
+
+        限制：採 read → check → write 模式（無 SELECT FOR UPDATE）。
+        高並發場景可能有 race（V2 補強）。
         """
         seg = self.get(segment_id)
         if seg is None:
