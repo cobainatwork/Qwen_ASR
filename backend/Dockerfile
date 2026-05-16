@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 FROM deps AS builder
 
 ARG INSTALL_GPU_DEPS=false
+ARG INSTALL_AUDIO_DEPS=false
 
 WORKDIR /build
 COPY pyproject.toml ./
@@ -36,12 +37,10 @@ RUN python -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip wheel setuptools
 ENV PATH="/opt/venv/bin:$PATH"
 
-# 條件式安裝 GPU 依賴
-RUN if [ "$INSTALL_GPU_DEPS" = "true" ]; then \
-        pip install -e ".[gpu]"; \
-    else \
-        pip install -e "."; \
-    fi
+# 條件式安裝依賴：base → [audio]（M3 起）→ [gpu]（M4 起）
+RUN pip install -e "." \
+    && if [ "$INSTALL_AUDIO_DEPS" = "true" ]; then pip install -e ".[audio]"; fi \
+    && if [ "$INSTALL_GPU_DEPS" = "true" ]; then pip install -e ".[gpu]"; fi
 
 # ============================================================
 # Stage 3: runtime — 最終映像

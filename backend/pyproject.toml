@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 readme = { content-type = "text/markdown", text = "Backend for Qwen3-ASR platform. See docs/superpowers/specs/." }
 
 dependencies = [
-  # 核心框架（M2 起使用，先列依賴避免 M2 重複改動）
+  # 核心框架（M2 起使用）
   "fastapi>=0.115.0",
   "uvicorn[standard]>=0.32.0",
   "pydantic>=2.9.0",
@@ -21,13 +21,6 @@ dependencies = [
   "argon2-cffi>=23.1.0",
   "structlog>=24.4.0",
   "python-multipart>=0.0.17",
-  # 預處理依賴（M3 起使用）
-  "python-magic>=0.4.27",
-  "torch>=2.4.0",
-  "torchaudio>=2.4.0",
-  "soxr>=0.5.0",
-  "soundfile>=0.12.1",
-  "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +33,15 @@ dev = [
   "factory-boy>=3.3.1",
   "ruff>=0.7.0",
   "mypy>=1.13.0",
+]
+audio = [
+  # M3 預處理管線：MIME 偵測 + 音檔解碼 / 重取樣
+  "python-magic>=0.4.27",
+  "torch>=2.4.0",
+  "torchaudio>=2.4.0",
+  "soxr>=0.5.0",
+  "soundfile>=0.12.1",
+  "numpy>=1.26.0",
 ]
 gpu = [
   # vLLM 與 GPU 推理（M4 起使用）；CPU CI 不安裝

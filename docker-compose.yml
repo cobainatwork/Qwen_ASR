@@ -30,6 +30,7 @@ services:
       target: runtime
       args:
         INSTALL_GPU_DEPS: ${INSTALL_GPU_DEPS:-false}
+        INSTALL_AUDIO_DEPS: ${INSTALL_AUDIO_DEPS:-false}
     image: qwen-asr-backend:dev
     container_name: qwen-asr-backend
     environment:
