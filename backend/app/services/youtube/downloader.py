@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 from uuid import uuid4
 
@@ -20,6 +21,37 @@ from app.core.config import Settings
 from app.core.exceptions import YoutubeDownloadFailedError, YoutubeFileTooLargeError
 
 logger = structlog.get_logger(__name__)
+
+
+def _import_yt_dlp() -> ModuleType:
+    """延遲 import yt-dlp（與其他 audio extras 一致策略）。"""
+    try:
+        import yt_dlp  # type: ignore[import-untyped]
+    except ImportError as e:
+        raise YoutubeDownloadFailedError(message="yt-dlp 未安裝") from e
+    return yt_dlp  # type: ignore[no-any-return]
+
+
+def _build_yt_options(out_template: str) -> dict[str, Any]:
+    """建構 yt-dlp 下載參數（bestaudio + ffmpeg wav 轉檔）。"""
+    return {
+        "format": "bestaudio/best",
+        "outtmpl": out_template,
+        "quiet": True,
+        "no_warnings": True,
+        "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
+    }
+
+
+def _resolve_output_file(target_dir: Path, file_id: str) -> Path:
+    """yt-dlp 完成後找出實際輸出檔（.wav 優先，否則 glob 同 id）。"""
+    audio_path = target_dir / f"{file_id}.wav"
+    if audio_path.exists():
+        return audio_path
+    candidates = list(target_dir.glob(f"{file_id}.*"))
+    if not candidates:
+        raise YoutubeDownloadFailedError(message="yt-dlp 未產出檔案")
+    return candidates[0]
 
 
 @dataclass
@@ -38,10 +70,7 @@ class YoutubeDownloadResult:
 
 async def fetch_metadata(url: str) -> YoutubeMetadata:
     """以 yt-dlp metadata-only 模式取得影片資訊。"""
-    try:
-        import yt_dlp  # type: ignore[import-untyped]
-    except ImportError as e:
-        raise YoutubeDownloadFailedError(message="yt-dlp 未安裝") from e
+    yt_dlp = _import_yt_dlp()
 
     def _extract() -> dict[str, Any]:
         with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "skip_download": True}) as ydl:
@@ -72,22 +101,11 @@ async def download_audio(url: str, target_dir: Path, settings: Settings) -> Yout
             },
         )
 
-    try:
-        import yt_dlp
-    except ImportError as e:
-        raise YoutubeDownloadFailedError(message="yt-dlp 未安裝") from e
-
+    yt_dlp = _import_yt_dlp()
     target_dir.mkdir(parents=True, exist_ok=True)  # noqa: ASYNC240
     file_id = str(uuid4())
     out_template = str(target_dir / f"{file_id}.%(ext)s")
-
-    options = {
-        "format": "bestaudio/best",
-        "outtmpl": out_template,
-        "quiet": True,
-        "no_warnings": True,
-        "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
-    }
+    options = _build_yt_options(out_template)
 
     def _run() -> None:
         with yt_dlp.YoutubeDL(options) as ydl:
@@ -98,13 +116,7 @@ async def download_audio(url: str, target_dir: Path, settings: Settings) -> Yout
     except Exception as e:
         raise YoutubeDownloadFailedError(details={"error": str(e)}) from e
 
-    audio_path = target_dir / f"{file_id}.wav"
-    if not audio_path.exists():
-        candidates = list(target_dir.glob(f"{file_id}.*"))  # noqa: ASYNC240
-        if not candidates:
-            raise YoutubeDownloadFailedError(message="yt-dlp 未產出檔案")
-        audio_path = candidates[0]
-
+    audio_path = _resolve_output_file(target_dir, file_id)
     size = audio_path.stat().st_size
     if size > max_bytes:
         audio_path.unlink(missing_ok=True)

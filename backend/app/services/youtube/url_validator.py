@@ -9,9 +9,9 @@ from app.core.config import Settings
 from app.core.exceptions import YoutubeUrlInvalidError
 
 _YOUTUBE_PATTERNS = [
-    re.compile(r"^https://(?:www\.)?youtube\.com/watch\?v=[\w-]{6,20}(?:&|$)"),
-    re.compile(r"^https://youtu\.be/[\w-]{6,20}(?:\?|$)"),
-    re.compile(r"^https://(?:www\.)?youtube\.com/embed/[\w-]{6,20}(?:\?|$)"),
+    re.compile(r"^https://(?:www\.)?youtube\.com/watch\?v=[\w-]{6,20}(?:[&?#]|$)"),
+    re.compile(r"^https://youtu\.be/[\w-]{6,20}(?:[?#]|$)"),
+    re.compile(r"^https://(?:www\.)?youtube\.com/embed/[\w-]{6,20}(?:[?#]|$)"),
 ]
 
 

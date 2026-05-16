@@ -43,3 +43,12 @@ def test_custom_whitelist() -> None:
     s = _settings(whitelist="example.com")
     with pytest.raises(YoutubeUrlInvalidError):
         validate_youtube_url("https://www.youtube.com/watch?v=abc12345", s)
+
+
+@pytest.mark.parametrize("url", [
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ#t=10",
+    "https://youtu.be/dQw4w9WgXcQ#t=120",
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLxyz",
+])
+def test_valid_urls_with_fragment_or_query(url: str) -> None:
+    assert validate_youtube_url(url, _settings()) == url
