@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     OPENAPI_DOCS_ENABLED: bool = True
     OPENAPI_DOCS_REQUIRE_AUTH: bool = False
 
+    # ----- Hotword 三層分流閾值 -----
+    HOTWORD_SHALLOW_FUSION_THRESHOLD: int = 100
+    HOTWORD_CTC_WS_THRESHOLD: int = 1000
+
     # ----- 補充：認證查找用 HMAC 密鑰 -----
     # 注意：Phase 1 暫以 API_KEY 衍生 HMAC 密鑰；正式部署應獨立提供
     LOOKUP_HMAC_KEY: str | None = None
