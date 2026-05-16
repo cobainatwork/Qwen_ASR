@@ -2,7 +2,11 @@ import pytest
 from app.core.exceptions import (
     ALL_ERROR_CODES,
     AppException,
+    DatasetNotFoundError,
+    DatasetSampleInvalidError,
     ForbiddenError,
+    HotwordGroupNotFoundError,
+    HotwordTooLargeError,
     MissingBearerError,
     UnauthorizedError,
 )
@@ -41,3 +45,18 @@ def test_all_error_codes_unique() -> None:
 
 def test_all_error_codes_at_least_20() -> None:
     assert len(ALL_ERROR_CODES) >= 20
+
+
+def test_m5_error_codes_defaults() -> None:
+    assert HotwordGroupNotFoundError().code == "HOTWORD_GROUP_NOT_FOUND"
+    assert HotwordGroupNotFoundError().http_status == 404
+    assert HotwordTooLargeError().http_status == 422
+    assert DatasetNotFoundError().http_status == 404
+    assert DatasetSampleInvalidError().http_status == 400
+
+
+def test_all_error_codes_includes_m5() -> None:
+    assert "HOTWORD_GROUP_NOT_FOUND" in ALL_ERROR_CODES
+    assert "HOTWORD_TOO_LARGE" in ALL_ERROR_CODES
+    assert "DATASET_NOT_FOUND" in ALL_ERROR_CODES
+    assert "DATASET_SAMPLE_INVALID" in ALL_ERROR_CODES

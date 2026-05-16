@@ -145,6 +145,31 @@ class QueueFullError(AppException):
     message = "處理佇列已滿"
 
 
+# ----- Phase 2 / M5 -----
+class HotwordGroupNotFoundError(AppException):
+    code = "HOTWORD_GROUP_NOT_FOUND"
+    http_status = 404
+    message = "Hotword 群組不存在"
+
+
+class HotwordTooLargeError(AppException):
+    code = "HOTWORD_TOO_LARGE"
+    http_status = 422
+    message = "Hotword 群組超過 1000 詞，請建立 Fine-tune 任務"
+
+
+class DatasetNotFoundError(AppException):
+    code = "DATASET_NOT_FOUND"
+    http_status = 404
+    message = "Dataset 不存在"
+
+
+class DatasetSampleInvalidError(AppException):
+    code = "DATASET_SAMPLE_INVALID"
+    http_status = 400
+    message = "樣本資料不符規範"
+
+
 # 完整錯誤碼清單（用於 OpenAPI 文件與測試自動化）
 ALL_ERROR_CODES: tuple[str, ...] = (
     "INTERNAL_ERROR",
@@ -167,4 +192,8 @@ ALL_ERROR_CODES: tuple[str, ...] = (
     "ASR_INFERENCE_FAILED",
     "ASR_REQUEST_TIMEOUT",
     "QUEUE_FULL",
+    "HOTWORD_GROUP_NOT_FOUND",
+    "HOTWORD_TOO_LARGE",
+    "DATASET_NOT_FOUND",
+    "DATASET_SAMPLE_INVALID",
 )
