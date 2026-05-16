@@ -5,13 +5,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
-import soundfile as sf
-import torch
-import torchaudio.transforms as _T
-
 from app.core.exceptions import AudioDecodeTimeoutError, AudioResampleFailedError
 
 _RESAMPLE_TIMEOUT_SEC = 30
+
+
+def _require_audio_deps() -> tuple:
+    """延遲載入 audio optional deps；缺少套件時拋出 RuntimeError。"""
+    try:
+        import soundfile as sf
+        import torch
+        import torchaudio.transforms as _T  # type: ignore[import-not-found]
+    except ImportError as e:
+        raise RuntimeError(
+            "audio 套件未安裝（soundfile/torch/torchaudio）。"
+            "請以 INSTALL_AUDIO_DEPS=true 重建映像。"
+        ) from e
+    return sf, torch, _T
 
 
 @dataclass
@@ -22,13 +32,14 @@ class ResampleResult:
     resampling_warning: bool
 
 
-def _load_audio(src: Path) -> tuple[torch.Tensor, int]:
+def _load_audio(src: Path) -> tuple:
     """以 soundfile 載入音檔，回傳 (waveform: Tensor[C, T], orig_sr: int)。
 
     soundfile 讀取 PCM_U8 時已自動正規化為 float32 [-0.5, 0.5]；
     其餘格式正規化為 [-1.0, 1.0]。均符合後續重取樣輸入範圍。
     讀取結果為 0 個樣本時，視為損壞檔案並拋出 RuntimeError。
     """
+    sf, torch, _T = _require_audio_deps()
     with sf.SoundFile(str(src)) as f:
         frames = f.read(dtype="float32", always_2d=True)  # shape [T, C]
     if frames.shape[0] == 0:
@@ -41,6 +52,7 @@ def _load_audio(src: Path) -> tuple[torch.Tensor, int]:
 
 async def resample_to_16k_mono(src: Path, dst_dir: Path) -> ResampleResult:
     """將任意取樣率 / 通道 / 位元深度音檔轉為 16 kHz mono 16-bit WAV。"""
+    sf, torch, _T = _require_audio_deps()
     await asyncio.to_thread(dst_dir.mkdir, parents=True, exist_ok=True)
     try:
         async with asyncio.timeout(_RESAMPLE_TIMEOUT_SEC):

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import magic
-
 from app.core.exceptions import AudioMimeInvalidError
 
 # python-magic 偵測結果與允許副檔名的對應
@@ -37,6 +35,13 @@ def verify_mime(buf: bytes, supported_formats: list[str]) -> tuple[str, str]:
     """
     if not buf:
         raise AudioMimeInvalidError(message="檔案為空")
+
+    try:
+        import magic  # 延遲 import：audio optional deps 未安裝時不影響啟動
+    except ImportError as e:
+        raise RuntimeError(
+            "python-magic 套件未安裝。請以 INSTALL_AUDIO_DEPS=true 重建映像。"
+        ) from e
 
     detected = magic.from_buffer(buf, mime=True)
     if not (detected.startswith("audio/") or detected.startswith("video/")):
