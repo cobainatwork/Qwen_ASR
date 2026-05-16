@@ -38,9 +38,11 @@ RUN python -m venv /opt/venv && \
 ENV PATH="/opt/venv/bin:$PATH"
 
 # 條件式安裝依賴：base → [audio]（M3 起）→ [gpu]（M4 起）
-RUN pip install -e "." \
-    && if [ "$INSTALL_AUDIO_DEPS" = "true" ]; then pip install -e ".[audio]"; fi \
-    && if [ "$INSTALL_GPU_DEPS" = "true" ]; then pip install -e ".[gpu]"; fi
+# 使用正式安裝（非 editable）確保 site-packages 內含 app 套件，
+# 不依賴 /build 目錄，Stage 3 runtime 可正確 import。
+RUN pip install "." \
+    && if [ "$INSTALL_AUDIO_DEPS" = "true" ]; then pip install ".[audio]"; fi \
+    && if [ "$INSTALL_GPU_DEPS" = "true" ]; then pip install ".[gpu]"; fi
 
 # ============================================================
 # Stage 3: runtime — 最終映像
@@ -56,6 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         libpq5 \
         ca-certificates \
+        curl \
         tini \
     && rm -rf /var/lib/apt/lists/*
 
