@@ -55,6 +55,38 @@ def _configure_app(settings: Settings) -> FastAPI:
                 raise
             logger.warning("vLLM initialize skipped (development)", error=str(e))
 
+        # M7：載入 Aligner / Diarization（dev 容忍 ImportError）
+        if settings.ALIGNER_ENABLED:
+            try:
+                from app.services.aligner import AlignerService
+                AlignerService.load(settings)
+            except RuntimeError as e:
+                if settings.ENV == "production":
+                    raise
+                logger.warning("AlignerService load skipped (development)", error=str(e))
+
+        if settings.DIARIZATION_ENABLED:
+            try:
+                from app.services.diarization import DiarizationService
+                DiarizationService.load(settings)
+            except RuntimeError as e:
+                if settings.ENV == "production":
+                    raise
+                logger.warning("DiarizationService load skipped (development)", error=str(e))
+
+        # KenLM（可選）
+        if settings.CORRECTION_KENLM_ENABLED and settings.CORRECTION_KENLM_MODEL_PATH:
+            try:
+                from app.services.correction.kenlm_corrector import KenlmCorrector
+                KenlmCorrector.load(settings.CORRECTION_KENLM_MODEL_PATH)
+            except RuntimeError as e:
+                logger.warning("KenLM load skipped", error=str(e))
+
+        # Homophone（純 CPU 配置）
+        if settings.CORRECTION_HOMOPHONE_ENABLED:
+            from app.services.correction.homophone import HomophoneCorrector
+            HomophoneCorrector.configure(True)
+
         # 啟動 ASR 佇列與 consumer
         queue = AsyncioQueueBackend(
             realtime_max=settings.QUEUE_REALTIME_MAX_SIZE,

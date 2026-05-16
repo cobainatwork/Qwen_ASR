@@ -23,10 +23,33 @@ class _MockEngine:
 
 
 @pytest.fixture(autouse=True)
-def _reset_engine() -> None:
+def _reset_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    """每個測試前重置 engine，並注入最小 Settings 使後處理階段全數關閉。"""
+    import app.core.config as _config_mod
+    from app.core.config import Settings
+
+    _original_get_settings = _config_mod.get_settings
+    _original_get_settings.cache_clear()
+
+    fake_settings = Settings(
+        API_KEY="unit-test",
+        DATABASE_URL="postgresql+psycopg://u:p@h/d",
+        DB_PASSWORD="p",
+        THIRD_PARTY_LICENSE_ACK=True,
+        ALIGNER_ENABLED=False,
+        DIARIZATION_ENABLED=False,
+        POST_PROCESSING_ENABLED=False,
+        CORRECTION_NEC_ENABLED=False,
+        CORRECTION_KENLM_ENABLED=False,
+        CORRECTION_HOMOPHONE_ENABLED=False,
+        CORRECTION_LLM_BACKEND="none",
+    )  # type: ignore[call-arg]
+    monkeypatch.setattr("app.core.config.get_settings", lambda: fake_settings)
+
     AsrEngineManager.set_engine_for_test(None, model_version="unknown")
     yield
     AsrEngineManager.set_engine_for_test(None, model_version="unknown")
+    _original_get_settings.cache_clear()
 
 
 @pytest.mark.asyncio
