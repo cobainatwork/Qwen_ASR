@@ -59,6 +59,7 @@ def test_download_valid_url_creates_record(youtube_app) -> None:
         )
     assert resp.status_code == 201
     assert resp.json()["data"]["status"] == "pending"
+    assert resp.json()["data"]["url"] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
 def test_download_invalid_url(youtube_app) -> None:
@@ -73,7 +74,7 @@ def test_download_invalid_url(youtube_app) -> None:
     assert resp.json()["error"]["code"] == "YOUTUBE_URL_INVALID"
 
 
-def test_download_non_https(youtube_app) -> None:
+def test_download_non_https_returns_400(youtube_app) -> None:
     app, token = youtube_app
     with TestClient(app) as client:
         resp = client.post(
@@ -82,6 +83,7 @@ def test_download_non_https(youtube_app) -> None:
             headers=_headers(token),
         )
     assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "YOUTUBE_URL_INVALID"
 
 
 def test_list_downloads(youtube_app) -> None:

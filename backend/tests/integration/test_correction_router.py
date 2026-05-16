@@ -116,6 +116,15 @@ def test_update_segment_with_correct_version(corr_app, db_session: Session) -> N
     assert data["corrected_text"] == "修正後"
     assert data["version"] == 2
 
+    # 驗 DB 持久化
+    db_session.expire_all()
+    row = db_session.execute(
+        text("SELECT version, corrected_text FROM correction_segments WHERE id = :id"),
+        {"id": seg_id},
+    ).one()
+    assert row.version == 2
+    assert row.corrected_text == "修正後"
+
 
 def test_update_segment_version_mismatch(corr_app, db_session: Session) -> None:
     app, token, session_id, _ = corr_app
@@ -141,6 +150,15 @@ def test_update_segment_version_mismatch(corr_app, db_session: Session) -> None:
     assert body["error"]["code"] == "CORRECTION_VERSION_MISMATCH"
     assert body["error"]["details"]["actual_version"] == 2
 
+    # 驗 DB：第二次 stale request 未覆寫資料
+    db_session.expire_all()
+    row = db_session.execute(
+        text("SELECT version, corrected_text FROM correction_segments WHERE id = :id"),
+        {"id": seg_id},
+    ).one()
+    assert row.version == 2  # 第一次 update 後的版本
+    assert row.corrected_text == "first"  # 第二次 stale request 未覆寫
+
 
 def test_get_session_not_found(corr_app) -> None:
     app, token, _, _ = corr_app
@@ -148,3 +166,58 @@ def test_get_session_not_found(corr_app) -> None:
         resp = client.get("/api/v1/correction/sessions/9999", headers=_headers(token))
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "CORRECTION_SESSION_NOT_FOUND"
+
+
+def test_export_to_dataset(corr_app, db_session: Session) -> None:
+    app, token, session_id, api_key_id = corr_app
+
+    # 建立 dataset（無 status 欄位）
+    db_session.execute(
+        text(
+            "INSERT INTO datasets (api_key_id, name, sample_count, total_duration_sec) "
+            "VALUES (:a, 'ds-export', 0, 0)"
+        ),
+        {"a": api_key_id},
+    )
+    dataset_id = int(
+        db_session.execute(text("SELECT id FROM datasets WHERE name = 'ds-export'")).scalar_one()
+    )
+    db_session.commit()
+
+    # 取得 2 個 segment 的 id
+    seg_ids = [
+        int(r) for r in db_session.execute(
+            text("SELECT id FROM correction_segments WHERE session_id = :s ORDER BY segment_index"),
+            {"s": session_id},
+        ).scalars().all()
+    ]
+
+    with TestClient(app) as client:
+        # 先 PUT 兩個 segment 填入 corrected_text
+        for seg_id in seg_ids:
+            client.put(
+                f"/api/v1/correction/sessions/{session_id}/segments/{seg_id}",
+                json={"corrected_text": f"corrected-{seg_id}", "expected_version": 1},
+                headers=_headers(token),
+            )
+
+        resp = client.post(
+            f"/api/v1/correction/sessions/{session_id}/export-to-dataset",
+            json={"dataset_id": dataset_id},
+            headers=_headers(token),
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["inserted_count"] == 2
+    assert data["dataset_id"] == dataset_id
+
+    # 驗 DB：dataset_samples 確實寫入 2 筆
+    db_session.expire_all()
+    count = int(
+        db_session.execute(
+            text("SELECT COUNT(*) FROM dataset_samples WHERE dataset_id = :d"),
+            {"d": dataset_id},
+        ).scalar_one()
+    )
+    assert count == 2
