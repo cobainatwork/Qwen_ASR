@@ -232,6 +232,37 @@ class FinetunePromoteFailedError(AppException):
     message = "Checkpoint promote 失敗"
 
 
+# ----- Phase 2 / M9 -----
+class YoutubeUrlInvalidError(AppException):
+    code = "YOUTUBE_URL_INVALID"
+    http_status = 400
+    message = "YouTube URL 不符合白名單"
+
+
+class YoutubeDownloadFailedError(AppException):
+    code = "YOUTUBE_DOWNLOAD_FAILED"
+    http_status = 502
+    message = "yt-dlp 下載失敗"
+
+
+class YoutubeFileTooLargeError(AppException):
+    code = "YOUTUBE_FILE_TOO_LARGE"
+    http_status = 413
+    message = "影片下載大小超過上限"
+
+
+class CorrectionSessionNotFoundError(AppException):
+    code = "CORRECTION_SESSION_NOT_FOUND"
+    http_status = 404
+    message = "校正 session 不存在"
+
+
+class CorrectionVersionMismatchError(AppException):
+    code = "CORRECTION_VERSION_MISMATCH"
+    http_status = 409
+    message = "版本衝突：他人已修改過此段落"
+
+
 # 完整錯誤碼清單（用於 OpenAPI 文件與測試自動化）
 ALL_ERROR_CODES: tuple[str, ...] = (
     "INTERNAL_ERROR",
@@ -268,4 +299,9 @@ ALL_ERROR_CODES: tuple[str, ...] = (
     "FINETUNE_TASK_NOT_FOUND",
     "FINETUNE_CHECKPOINT_NOT_FOUND",
     "FINETUNE_PROMOTE_FAILED",
+    "YOUTUBE_URL_INVALID",
+    "YOUTUBE_DOWNLOAD_FAILED",
+    "YOUTUBE_FILE_TOO_LARGE",
+    "CORRECTION_SESSION_NOT_FOUND",
+    "CORRECTION_VERSION_MISMATCH",
 )

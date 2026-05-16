@@ -84,6 +84,14 @@ class Settings(BaseSettings):
     DATA_AUGMENTATION_ENABLED: bool = False
     FINETUNE_GPU_FRACTION: float = 0.65
 
+    # ----- Phase 2 / M9 -----
+    YOUTUBE_DOMAIN_WHITELIST: str = "youtube.com,youtu.be"
+    YOUTUBE_MAX_DOWNLOAD_SIZE_MB: int = 1024  # 1 GB
+
+    @property
+    def youtube_whitelist_set(self) -> set[str]:
+        return {d.strip().lower() for d in self.YOUTUBE_DOMAIN_WHITELIST.split(",") if d.strip()}
+
     # ----- 補充：認證查找用 HMAC 密鑰 -----
     # 注意：Phase 1 暫以 API_KEY 衍生 HMAC 密鑰；正式部署應獨立提供
     LOOKUP_HMAC_KEY: str | None = None
