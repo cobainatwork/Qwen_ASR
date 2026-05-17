@@ -36,16 +36,18 @@ dev = [
 ]
 audio = [
   # M3 預處理管線：MIME 偵測 + 音檔解碼 / 重取樣
+  # torch 上限 2.10：避開 cu130 nightly（要求 driver R580+，與 R570 不相容）
   "python-magic>=0.4.27",
-  "torch>=2.4.0",
-  "torchaudio>=2.4.0",
+  "torch>=2.4.0,<2.11",
+  "torchaudio>=2.4.0,<2.11",
   "soxr>=0.5.0",
   "soundfile>=0.12.1",
   "numpy>=1.26.0",
 ]
 gpu = [
   # vLLM 與 GPU 推理（M4 起使用）；CPU CI 不安裝
-  "vllm>=0.6.0",
+  # 鎖 0.19.x 系列（穩定相容 torch 2.8-2.9 + cu126/cu128，匹配 driver R570）
+  "vllm>=0.19.0,<0.20",
 ]
 
 [tool.hatch.build.targets.wheel]
