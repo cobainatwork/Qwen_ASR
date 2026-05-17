@@ -79,14 +79,14 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
-    # GPU runtime（部署環境取消註解；M1 不啟用）
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+    # GPU runtime（Phase 2 vendor profile 啟用；Phase 1 client profile 可忽略）
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
 volumes:
   pgdata:
