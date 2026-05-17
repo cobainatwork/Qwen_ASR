@@ -25,6 +25,7 @@ from app.services.asr.consumer import wait_for_job
 from app.services.asr.queue import AsrJob, QueueBackend, QueuePriority
 from app.services.audio import (
     FireRedVADService,
+    Segment,
     resample_to_16k_mono,
     store_upload,
     verify_mime,
@@ -93,7 +94,10 @@ async def transcribe(
     )
     db.commit()
 
-    vad_segments = await FireRedVADService.detect_speech(resample.output_path)
+    # VAD_ENABLED=false 時跳過 VAD（套件未安裝或環境關閉），整段直送 ASR
+    vad_segments: list[Segment] = []
+    if settings.VAD_ENABLED:
+        vad_segments = await FireRedVADService.detect_speech(resample.output_path)
 
     # 入佇列等待
     job = AsrJob(
