@@ -60,6 +60,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         tini \
+        gcc \
+        g++ \
+        python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 建立非 root 使用者
