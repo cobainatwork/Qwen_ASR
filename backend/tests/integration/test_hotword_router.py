@@ -1,13 +1,12 @@
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from app.core.security import derive_hmac_key, hash_token, lookup_prefix
 from app.deps.db import get_db
 from app.middleware import register_exception_handlers
 from app.routers.hotword import router as hotword_router
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 
 def _build_app(db_session: Session) -> FastAPI:
@@ -83,7 +82,11 @@ def test_get_group_not_found(hotword_app) -> None:
 def test_update_group(hotword_app) -> None:
     app, token = hotword_app
     with TestClient(app) as client:
-        create_resp = client.post("/api/v1/hotword/groups", json={"name": "old-name"}, headers=_headers(token))
+        create_resp = client.post(
+            "/api/v1/hotword/groups",
+            json={"name": "old-name"},
+            headers=_headers(token),
+        )
         group_id = create_resp.json()["data"]["id"]
         resp = client.put(
             f"/api/v1/hotword/groups/{group_id}",
@@ -97,7 +100,11 @@ def test_update_group(hotword_app) -> None:
 def test_delete_group(hotword_app) -> None:
     app, token = hotword_app
     with TestClient(app) as client:
-        create_resp = client.post("/api/v1/hotword/groups", json={"name": "to-delete"}, headers=_headers(token))
+        create_resp = client.post(
+            "/api/v1/hotword/groups",
+            json={"name": "to-delete"},
+            headers=_headers(token),
+        )
         group_id = create_resp.json()["data"]["id"]
         resp = client.delete(f"/api/v1/hotword/groups/{group_id}", headers=_headers(token))
         get_resp = client.get(f"/api/v1/hotword/groups/{group_id}", headers=_headers(token))
@@ -108,7 +115,11 @@ def test_delete_group(hotword_app) -> None:
 def test_bulk_upload_shallow_fusion(hotword_app) -> None:
     app, token = hotword_app
     with TestClient(app) as client:
-        create_resp = client.post("/api/v1/hotword/groups", json={"name": "vip"}, headers=_headers(token))
+        create_resp = client.post(
+            "/api/v1/hotword/groups",
+            json={"name": "vip"},
+            headers=_headers(token),
+        )
         group_id = create_resp.json()["data"]["id"]
         resp = client.post(
             f"/api/v1/hotword/groups/{group_id}/words/bulk",
@@ -125,7 +136,11 @@ def test_bulk_upload_shallow_fusion(hotword_app) -> None:
 def test_bulk_upload_ctc_ws(hotword_app) -> None:
     app, token = hotword_app
     with TestClient(app) as client:
-        create_resp = client.post("/api/v1/hotword/groups", json={"name": "medium"}, headers=_headers(token))
+        create_resp = client.post(
+            "/api/v1/hotword/groups",
+            json={"name": "medium"},
+            headers=_headers(token),
+        )
         group_id = create_resp.json()["data"]["id"]
         resp = client.post(
             f"/api/v1/hotword/groups/{group_id}/words/bulk",
@@ -139,7 +154,11 @@ def test_bulk_upload_ctc_ws(hotword_app) -> None:
 def test_bulk_upload_too_large(hotword_app) -> None:
     app, token = hotword_app
     with TestClient(app) as client:
-        create_resp = client.post("/api/v1/hotword/groups", json={"name": "huge"}, headers=_headers(token))
+        create_resp = client.post(
+            "/api/v1/hotword/groups",
+            json={"name": "huge"},
+            headers=_headers(token),
+        )
         group_id = create_resp.json()["data"]["id"]
         resp = client.post(
             f"/api/v1/hotword/groups/{group_id}/words/bulk",

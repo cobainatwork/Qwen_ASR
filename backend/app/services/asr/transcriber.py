@@ -61,8 +61,8 @@ def _load_wav_as_numpy(storage_path: str) -> tuple[Any, int]:
     輸出 float32 ndarray（shape: [samples]）以符合 qwen-asr
     transcribe(audio=[(np, sr)]) 介面。
     """
-    import numpy as np  # noqa: PLC0415
-    import soundfile as sf  # noqa: PLC0415
+    import numpy as np
+    import soundfile as sf
 
     wav, sample_rate = sf.read(storage_path, dtype="float32", always_2d=False)
     # mono WAV: shape (samples,)；stereo: (samples, 2) — 取第一聲道
@@ -149,17 +149,17 @@ class Transcriber:
         post_processing_metadata: dict[str, Any] = {}
         speakers: list[dict[str, Any]] | None = None
 
-        from app.core.config import get_settings  # noqa: PLC0415
+        from app.core.config import get_settings
 
         settings = get_settings()
 
-        from app.services.correction import (  # noqa: PLC0415
+        from app.services.correction import (
             CorrectionOptions,
             run_correction_pipeline,
         )
-        from app.services.diarization import DiarizationService  # noqa: PLC0415
-        from app.services.finetune.lock import is_finetune_active  # noqa: PLC0415
-        from app.services.post_processing import run_post_processing  # noqa: PLC0415
+        from app.services.diarization import DiarizationService
+        from app.services.finetune.lock import is_finetune_active
+        from app.services.post_processing import run_post_processing
 
         finetune_active = is_finetune_active(settings)
 
@@ -176,7 +176,7 @@ class Transcriber:
                     "backend": backend,
                     "speakers": len({s.speaker for s in segments}),
                 }
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 post_processing_metadata["diarization"] = {
                     "status": "failed",
                     "error": str(e),

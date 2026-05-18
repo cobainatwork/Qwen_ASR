@@ -61,7 +61,9 @@ def _load_audio(src: Path) -> tuple:
 
 async def resample_to_16k_mono(src: Path, dst_dir: Path) -> ResampleResult:
     """將任意取樣率 / 通道 / 位元深度音檔轉為 16 kHz mono 16-bit WAV。"""
-    sf, torch, _T = _require_audio_deps()
+    # 此函式僅用到 sf 與 _T；torch 不直接呼叫，但 _require_audio_deps()
+    # 仍須觸發延遲 import，缺 audio extras 時於此 raise。
+    sf, _torch, _T = _require_audio_deps()
     await asyncio.to_thread(dst_dir.mkdir, parents=True, exist_ok=True)
     try:
         async with asyncio.timeout(_RESAMPLE_TIMEOUT_SEC):

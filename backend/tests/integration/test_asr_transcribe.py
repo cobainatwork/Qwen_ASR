@@ -23,11 +23,6 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from app.core.security import derive_hmac_key, hash_token, lookup_prefix
 from app.deps.db import get_db
 from app.middleware import register_exception_handlers
@@ -36,6 +31,10 @@ from app.services.asr.engine import AsrEngineManager
 from app.services.asr.queue import AsrJob, AsyncioQueueBackend
 from app.services.asr.transcriber import Transcriber
 from app.services.audio.vad import FireRedVADService
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "audio"
 
@@ -43,7 +42,7 @@ FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "audio"
 class _MockAsrModel:
     """Qwen3ASRModel.LLM 替身（qwen-asr 0.0.6 介面）：transcribe 為同步方法。"""
 
-    def transcribe(self, audio: Any, **kwargs: Any) -> list[Any]:  # noqa: ARG002
+    def transcribe(self, audio: Any, **kwargs: Any) -> list[Any]:
         result = MagicMock()
         result.text = "你好世界，這是測試辨識結果。"
         result.language = "Chinese"
@@ -105,7 +104,9 @@ def app_with_asr(
 
     # patch wait_for_job：改為直接在 event loop 內執行 Transcriber
     # 避免 AsrConsumer background task 的 sync psycopg 阻塞 event loop
-    async def _inline_wait_for_job(job: AsrJob, timeout: float) -> int:
+    # ASYNC109 noqa：簽章必須匹配 real app.routers.asr.wait_for_job(job, timeout)
+    # 才能被 monkeypatch.setattr 取代；mock 內部立即返回故 timeout 參數不使用。
+    async def _inline_wait_for_job(job: AsrJob, timeout: float) -> int:  # noqa: ASYNC109
         transcriber = Transcriber(db_session, job.api_key_id, max_duration_sec=1200)
         outcome = await transcriber.run(job)
         return outcome.transcription_id

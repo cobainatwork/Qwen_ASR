@@ -49,7 +49,7 @@ class _MockAsrModel:
     回傳 5 個 word-level segments，不再經 AlignerService（v1.10 §3.3.2）。
     """
 
-    def transcribe(self, audio: Any, **kwargs: Any) -> list[Any]:  # noqa: ARG002
+    def transcribe(self, audio: Any, **kwargs: Any) -> list[Any]:
         result = MagicMock()
         result.text = "我在試一次"
         result.language = "Chinese"

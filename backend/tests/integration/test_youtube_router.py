@@ -1,13 +1,12 @@
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from app.core.security import derive_hmac_key, hash_token, lookup_prefix
 from app.deps.db import get_db
 from app.middleware import register_exception_handlers
 from app.routers.youtube import router as youtube_router
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 
 def _build_app(db_session: Session) -> FastAPI:
@@ -19,7 +18,9 @@ def _build_app(db_session: Session) -> FastAPI:
 
 
 @pytest.fixture
-def youtube_app(db_session: Session, monkeypatch: pytest.MonkeyPatch, tmp_path) -> tuple[FastAPI, str]:
+def youtube_app(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> tuple[FastAPI, str]:
     monkeypatch.setenv("API_KEY", "yt-test")
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@h/d")
     monkeypatch.setenv("DB_PASSWORD", "p")

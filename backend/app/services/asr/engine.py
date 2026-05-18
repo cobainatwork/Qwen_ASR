@@ -27,7 +27,7 @@ _DTYPE_MAP: dict[str, Any] = {}
 def _get_dtype_map() -> dict[str, Any]:
     """惰性初始化 dtype 對照表，避免頂層 import torch（CPU CI 無 torch）。"""
     if not _DTYPE_MAP:
-        import torch  # noqa: PLC0415
+        import torch
 
         _DTYPE_MAP["bfloat16"] = torch.bfloat16
         _DTYPE_MAP["float16"] = torch.float16

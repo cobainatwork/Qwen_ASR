@@ -1,13 +1,12 @@
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from app.core.security import derive_hmac_key, hash_token, lookup_prefix
 from app.deps.db import get_db
 from app.middleware import register_exception_handlers
 from app.routers.correction import router as correction_router
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 
 def _build_app(db_session: Session) -> FastAPI:
@@ -42,21 +41,37 @@ def corr_app(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> tuple[Fast
         ),
         {"h": hash_token(raw_token), "p": lookup_prefix(raw_token, hmac_key)},
     )
-    api_key_id = int(db_session.execute(text("SELECT id FROM api_keys WHERE name = 'corrk'")).scalar_one())
+    api_key_id = int(
+        db_session.execute(
+            text("SELECT id FROM api_keys WHERE name = 'corrk'")
+        ).scalar_one()
+    )
 
     # 建立一個假 transcription + audio_file
-    db_session.execute(text(
-        "INSERT INTO audio_files (api_key_id, original_name, storage_path, file_size, duration_sec) "
-        "VALUES (:a, 't.wav', '/tmp/t.wav', 1024, 10.0)"
-    ), {"a": api_key_id})
-    audio_id = int(db_session.execute(text("SELECT id FROM audio_files ORDER BY id DESC LIMIT 1")).scalar_one())
+    db_session.execute(
+        text(
+            "INSERT INTO audio_files "
+            "(api_key_id, original_name, storage_path, file_size, duration_sec) "
+            "VALUES (:a, 't.wav', '/tmp/t.wav', 1024, 10.0)"
+        ),
+        {"a": api_key_id},
+    )
+    audio_id = int(
+        db_session.execute(
+            text("SELECT id FROM audio_files ORDER BY id DESC LIMIT 1")
+        ).scalar_one()
+    )
 
     db_session.execute(text(
         "INSERT INTO transcriptions "
         "(api_key_id, source, model_name, model_version, transcript_text, duration_sec) "
         "VALUES (:a, 'upload', 'm', 'v1', '原始文字', 10.0)"
     ), {"a": api_key_id})
-    transcription_id = int(db_session.execute(text("SELECT id FROM transcriptions ORDER BY id DESC LIMIT 1")).scalar_one())
+    transcription_id = int(
+        db_session.execute(
+            text("SELECT id FROM transcriptions ORDER BY id DESC LIMIT 1")
+        ).scalar_one()
+    )
     db_session.execute(text(
         "UPDATE audio_files SET transcription_id = :t WHERE id = :a"
     ), {"t": transcription_id, "a": audio_id})
@@ -66,7 +81,11 @@ def corr_app(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> tuple[Fast
         "INSERT INTO correction_sessions (api_key_id, transcription_id, name) "
         "VALUES (:a, :t, 'sess')"
     ), {"a": api_key_id, "t": transcription_id})
-    session_id = int(db_session.execute(text("SELECT id FROM correction_sessions ORDER BY id DESC LIMIT 1")).scalar_one())
+    session_id = int(
+        db_session.execute(
+            text("SELECT id FROM correction_sessions ORDER BY id DESC LIMIT 1")
+        ).scalar_one()
+    )
 
     for i in range(2):
         db_session.execute(text(
@@ -94,7 +113,10 @@ def test_get_session(corr_app) -> None:
 def test_list_segments(corr_app) -> None:
     app, token, session_id, _ = corr_app
     with TestClient(app) as client:
-        resp = client.get(f"/api/v1/correction/sessions/{session_id}/segments", headers=_headers(token))
+        resp = client.get(
+            f"/api/v1/correction/sessions/{session_id}/segments",
+            headers=_headers(token),
+        )
     assert resp.status_code == 200
     assert len(resp.json()["data"]) == 2
 

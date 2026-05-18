@@ -22,7 +22,7 @@ import pytest
 @pytest.mark.gpu
 def test_qwen3_asr_model_imports() -> None:
     """確認 qwen-asr 套件可正確 import，Qwen3ASRModel.LLM 存在。"""
-    from qwen_asr import Qwen3ASRModel  # noqa: PLC0415
+    from qwen_asr import Qwen3ASRModel
 
     assert hasattr(Qwen3ASRModel, "LLM"), "Qwen3ASRModel 缺少 LLM 屬性"
 
@@ -34,10 +34,9 @@ def test_asr_engine_initialize_and_transcribe(tmp_path: Path) -> None:
     本測試不驗證辨識準確度（語音內容為白雜訊），只驗證介面不拋例外、
     回傳物件含 text / language / time_stamps。
     """
-    import numpy as np  # noqa: PLC0415
-
-    from app.core.config import Settings  # noqa: PLC0415
-    from app.services.asr.engine import AsrEngineManager  # noqa: PLC0415
+    import numpy as np
+    from app.core.config import Settings
+    from app.services.asr.engine import AsrEngineManager
 
     model_cache_dir = Path(os.environ.get("MODEL_CACHE_DIR", "/data/models"))
     settings = Settings(
@@ -84,13 +83,15 @@ def test_asr_engine_initialize_and_transcribe(tmp_path: Path) -> None:
 @pytest.mark.gpu
 def test_smoke_script_executes() -> None:
     """確認 smoke_asr.sh 腳本語法正確（僅解析，不執行真實 HTTP 請求）。"""
-    import subprocess  # noqa: PLC0415
+    import subprocess
 
     smoke_script = Path("scripts/smoke_asr.sh")
     assert smoke_script.exists(), f"smoke script 不存在：{smoke_script}"
 
-    result = subprocess.run(
-        ["bash", "-n", str(smoke_script)],
+    # S603 noqa：arg 為硬寫的 list 非使用者輸入。
+    # S607 noqa："bash" partial path 是測試環境慣例（依 PATH 解析）。
+    result = subprocess.run(  # noqa: S603
+        ["bash", "-n", str(smoke_script)],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,

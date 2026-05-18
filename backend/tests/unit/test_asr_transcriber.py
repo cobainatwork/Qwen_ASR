@@ -4,9 +4,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from app.core.exceptions import (
     AsrAudioTooLongError,
     AsrCudaError,
@@ -17,6 +14,8 @@ from app.repositories.audio_file import AudioFileRepository
 from app.services.asr.engine import AsrEngineManager
 from app.services.asr.queue import AsrJob
 from app.services.asr.transcriber import Transcriber, _parse_timestamps
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 
 def _make_mock_result(
@@ -46,7 +45,7 @@ class _MockAsrModel:
     def __init__(self, result: Any | Exception) -> None:
         self._result = result
 
-    def transcribe(self, audio: Any, **kwargs: Any) -> list[Any]:  # noqa: ARG002
+    def transcribe(self, audio: Any, **kwargs: Any) -> list[Any]:
         if isinstance(self._result, Exception):
             raise self._result
         return [self._result]

@@ -17,7 +17,7 @@ class _MockAsrModel:
     def __init__(self, output: Any | Exception) -> None:
         self.output = output
 
-    def transcribe(self, audio: Any, **kwargs: Any) -> list[Any]:  # noqa: ARG002
+    def transcribe(self, audio: Any, **kwargs: Any) -> list[Any]:
         if isinstance(self.output, Exception):
             raise self.output
         return [self.output]

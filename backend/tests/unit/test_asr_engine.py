@@ -6,10 +6,8 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from app.core.exceptions import AsrEngineUnavailableError
 from app.services.asr.engine import AsrEngineManager, compute_model_version
-
 
 # ── compute_model_version（HF cache 優先 → legacy → fallback）──────────────
 
@@ -108,7 +106,6 @@ def test_shutdown_clears_asr() -> None:
 def test_initialize_calls_qwen3_asr_model(tmp_path: Path) -> None:
     """initialize() 必須以正確參數呼叫 Qwen3ASRModel.LLM，不拋例外。"""
     import torch
-
     from app.core.config import Settings
 
     settings = Settings(
@@ -129,9 +126,17 @@ def test_initialize_calls_qwen3_asr_model(tmp_path: Path) -> None:
     mock_asr_instance: Any = MagicMock()
     mock_llm_cls: Any = MagicMock(return_value=mock_asr_instance)
 
-    # Patch 同時 Qwen3ASRModel（可能為 None on CPU CI）與 dtype_map（避免實際 torch import 副作用）
-    with patch("app.services.asr.engine.Qwen3ASRModel") as mock_model_cls, \
-         patch("app.services.asr.engine._get_dtype_map", return_value={"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}):
+    # Patch 同時 Qwen3ASRModel（可能為 None on CPU CI）與 dtype_map
+    # （避免實際 torch import 副作用）
+    dtype_map = {
+        "bfloat16": torch.bfloat16,
+        "float16": torch.float16,
+        "float32": torch.float32,
+    }
+    with (
+        patch("app.services.asr.engine.Qwen3ASRModel") as mock_model_cls,
+        patch("app.services.asr.engine._get_dtype_map", return_value=dtype_map),
+    ):
         mock_model_cls.LLM = mock_llm_cls
         AsrEngineManager.initialize(settings)
 
@@ -171,9 +176,8 @@ def test_initialize_raises_on_invalid_dtype(tmp_path: Path) -> None:
     之後，AsrEngineManager.initialize 內的 `if dtype is None` 分支成為 defense-in-depth
     死碼（never reached），驗證點上移至 Settings 構造階段。
     """
-    from pydantic import ValidationError
-
     from app.core.config import Settings
+    from pydantic import ValidationError
 
     with pytest.raises(ValidationError, match="FORCED_ALIGNER_DTYPE"):
         Settings(

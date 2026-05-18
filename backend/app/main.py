@@ -58,7 +58,6 @@ def _configure_app(settings: Settings) -> FastAPI:
         # AlignerService 不再在 lifespan 載入；offline 批次校正由 ALIGNER_ENABLED 控制
 
         # M7：載入 Diarization（dev 容忍 ImportError）
-        # AlignerService 已不在 lifespan 載入（v1.10 §3.3.2），由 ALIGNER_ENABLED 控制 offline 批次校正
         if settings.DIARIZATION_ENABLED:
             try:
                 from app.services.diarization import DiarizationService

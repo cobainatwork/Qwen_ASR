@@ -33,7 +33,10 @@ class CorrectionSegment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("correction_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+        Integer,
+        ForeignKey("correction_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     segment_index: Mapped[int] = mapped_column(Integer, nullable=False)
     start_sec: Mapped[float] = mapped_column(Float, nullable=False)
