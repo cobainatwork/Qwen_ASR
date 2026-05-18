@@ -55,8 +55,11 @@ gpu = [
   # qwen-asr 官方套件（M4-revisit 改採），[vllm] extra 自帶 vllm==0.14.0
   # 不在此處直接約束 vllm 版本，讓 qwen-asr[vllm] 的 dependency resolver 決定
   "qwen-asr[vllm]>=0.0.6,<0.1",
-  # FlashAttention 2（bfloat16 推理加速）；build 需 CUDA toolkit
-  "flash-attn>=2.0.0,<3.0.0",
+  # NOTE: flash-attn 因 PEP 517 isolated build env 缺 torch + base image 缺
+  # nvcc，暫時不在 pip extras 內裝。vLLM 0.14.0 缺 flash-attn 時會 fallback
+  # 到 xformers / torch SDPA。未來補 flash-attn 需用 prebuilt wheel +
+  # Dockerfile 兩階段安裝（先 qwen-asr[vllm] 拉 torch，再 pip install
+  # flash-attn --no-build-isolation 或裝 prebuilt wheel）。
 ]
 
 [tool.hatch.build.targets.wheel]
