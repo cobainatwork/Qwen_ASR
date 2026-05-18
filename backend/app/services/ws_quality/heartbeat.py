@@ -29,7 +29,7 @@ class HeartbeatWatchdog:
         while True:
             try:
                 await asyncio.sleep(1.0)
-                now = asyncio.get_event_loop().time()
+                now = asyncio.get_running_loop().time()
                 elapsed = now - state.last_ping_at
                 if elapsed > timeout_sec:
                     logger.warning(
@@ -48,9 +48,9 @@ class HeartbeatWatchdog:
                         )
                     return
             except asyncio.CancelledError:
-                return
+                raise
 
     @staticmethod
     def touch(state: ConnectionState) -> None:
         """收到 ping 時更新 last_ping_at，重置超時計時器。"""
-        state.last_ping_at = asyncio.get_event_loop().time()
+        state.last_ping_at = asyncio.get_running_loop().time()

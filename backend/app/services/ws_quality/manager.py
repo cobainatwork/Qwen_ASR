@@ -68,7 +68,7 @@ class WebSocketManager:
             state = ConnectionState(
                 websocket=ws,
                 api_key_id=api_key_id,
-                last_ping_at=asyncio.get_event_loop().time(),
+                last_ping_at=asyncio.get_running_loop().time(),
             )
             cls._connections.setdefault(api_key_id, set()).add(state)
             logger.info(
