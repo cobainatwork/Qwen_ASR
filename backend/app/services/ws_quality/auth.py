@@ -1,4 +1,4 @@
-"""WebSocket 認證（規格 §12 + 強制規範 12）。
+"""WebSocket 認證（規格 §3.3.7 / §19.1 + CLAUDE.md 強制規範 12）。
 
 格式：``Sec-WebSocket-Protocol: asr.v1, bearer.<base64url(token)>``
 **禁止透過 query string 傳遞 token**（會被 access log / Referer 洩漏）。

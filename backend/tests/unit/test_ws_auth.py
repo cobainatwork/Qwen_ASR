@@ -99,3 +99,16 @@ def test_authenticate_invalid_token(db_session: Session, monkeypatch: pytest.Mon
     header = f"asr.v1, bearer.{_b64url('fake-token')}"
     with pytest.raises(WsAuthFailedError, match="token 無效"):
         authenticate_websocket(header, db_session, get_settings())
+
+
+def test_authenticate_missing_bearer(db_session: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    """asr.v1 在但 bearer 缺：補回認證流程的對稱分支（reviewer 找到的覆蓋缺口）。"""
+    monkeypatch.setenv("API_KEY", "x")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@h/d")
+    monkeypatch.setenv("DB_PASSWORD", "p")
+    monkeypatch.setenv("THIRD_PARTY_LICENSE_ACK", "true")
+    from app.core.config import get_settings
+    get_settings.cache_clear()
+
+    with pytest.raises(WsAuthFailedError, match="bearer"):
+        authenticate_websocket("asr.v1", db_session, get_settings())
