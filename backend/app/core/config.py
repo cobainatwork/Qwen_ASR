@@ -102,6 +102,12 @@ class Settings(BaseSettings):
     def youtube_whitelist_set(self) -> set[str]:
         return {d.strip().lower() for d in self.YOUTUBE_DOMAIN_WHITELIST.split(",") if d.strip()}
 
+    # ----- WebSocket -----
+    WS_MAX_MESSAGE_SIZE_MB: int = 50
+    WS_MAX_CONNECTIONS_PER_KEY: int = 10
+    # ----- Phase 2 / M10 -----
+    WS_HEARTBEAT_TIMEOUT_SEC: int = 90
+
     # ----- 補充：認證查找用 HMAC 密鑰 -----
     # 注意：Phase 1 暫以 API_KEY 衍生 HMAC 密鑰；正式部署應獨立提供
     LOOKUP_HMAC_KEY: str | None = None

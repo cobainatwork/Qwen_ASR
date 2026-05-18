@@ -263,6 +263,25 @@ class CorrectionVersionMismatchError(AppException):
     message = "版本衝突：他人已修改過此段落"
 
 
+# ----- Phase 2 / M10 -----
+class WsAuthFailedError(AppException):
+    code = "WS_AUTH_FAILED"
+    http_status = 401
+    message = "WebSocket 認證失敗"
+
+
+class WsMaxConnectionsError(AppException):
+    code = "WS_MAX_CONNECTIONS"
+    http_status = 429
+    message = "超過單金鑰 WS 連線上限"
+
+
+class WsMessageTooLargeError(AppException):
+    code = "WS_MESSAGE_TOO_LARGE"
+    http_status = 413
+    message = "訊息超過大小上限"
+
+
 # 完整錯誤碼清單（用於 OpenAPI 文件與測試自動化）
 ALL_ERROR_CODES: tuple[str, ...] = (
     "INTERNAL_ERROR",
@@ -304,4 +323,7 @@ ALL_ERROR_CODES: tuple[str, ...] = (
     "YOUTUBE_FILE_TOO_LARGE",
     "CORRECTION_SESSION_NOT_FOUND",
     "CORRECTION_VERSION_MISMATCH",
+    "WS_AUTH_FAILED",
+    "WS_MAX_CONNECTIONS",
+    "WS_MESSAGE_TOO_LARGE",
 )

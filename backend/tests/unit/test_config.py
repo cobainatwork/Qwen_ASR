@@ -51,3 +51,12 @@ def test_backend_type_locked_to_vllm(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(k, v)
     with pytest.raises(ValidationError):
         Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+def test_ws_heartbeat_timeout_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    for k, v in _base_env().items():
+        monkeypatch.setenv(k, v)
+    s = Settings(_env_file=None)  # type: ignore[call-arg]
+    assert s.WS_HEARTBEAT_TIMEOUT_SEC == 90
+    assert s.WS_MAX_MESSAGE_SIZE_MB == 50
+    assert s.WS_MAX_CONNECTIONS_PER_KEY == 10
