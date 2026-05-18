@@ -37,6 +37,13 @@ dev = [
 audio = [
   # M3 預處理管線：MIME 偵測 + 音檔解碼 / 重取樣
   # torch 上限 2.10：避開 cu130 nightly（要求 driver R580+，與 R570 不相容）
+  #
+  # 工程決策：音檔載入走 soundfile（libsndfile 直接綁定），刻意不引入
+  # torchcodec。torchaudio 2.9.x 委派 torchcodec 的解碼路徑在 ffmpeg 5.1
+  # 環境會於 C++ STL `vector::reserve` 觸發 std::length_error 並 kill
+  # worker process。soundfile 繞過該層；qwen-asr 0.0.6 於 host 端傳入
+  # numpy/tensor 時亦不會 fallback 到內部 torchcodec path。
+  # 詳見 backend/app/services/audio/resampler.py:_load_audio docstring。
   "python-magic>=0.4.27",
   "torch>=2.4.0,<2.11",
   "torchaudio>=2.4.0,<2.11",

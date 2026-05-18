@@ -38,6 +38,15 @@ def _load_audio(src: Path) -> tuple:
     soundfile 讀取 PCM_U8 時已自動正規化為 float32 [-0.5, 0.5]；
     其餘格式正規化為 [-1.0, 1.0]。均符合後續重取樣輸入範圍。
     讀取結果為 0 個樣本時，視為損壞檔案並拋出 RuntimeError。
+
+    工程決策：本平台音檔載入統一走 soundfile（直接綁定 libsndfile），
+    刻意不使用 ``torchaudio.load``。原因：torchaudio 2.9.x 廢除自家
+    backend，全部委派 torchcodec；torchcodec 0.7.0 在 slim-bookworm
+    ffmpeg 5.1 環境下會於 C++ STL ``vector::reserve`` 拋 ``std::length_error``
+    並終結 worker process（無 Python 例外可 catch）。soundfile 為純
+    libsndfile binding，繞過 codec / torchcodec 層；qwen-asr 0.0.6
+    於 host 端傳入 numpy/tensor 時亦不會落入內部 torchcodec path。
+    因此 pyproject ``[audio]`` extras 故意不引入 torchcodec。
     """
     sf, torch, _T = _require_audio_deps()
     with sf.SoundFile(str(src)) as f:
