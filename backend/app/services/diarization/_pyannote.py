@@ -22,9 +22,9 @@ def _patch_torchaudio_for_pyannote() -> None:
     import torchaudio
 
     if not hasattr(torchaudio, "AudioMetaData"):
-        torchaudio.AudioMetaData = object  # type: ignore[attr-defined]
+        torchaudio.AudioMetaData = object
     if not hasattr(torchaudio, "list_audio_backends"):
-        torchaudio.list_audio_backends = lambda: ["soundfile"]  # type: ignore[attr-defined]
+        torchaudio.list_audio_backends = lambda: ["soundfile"]
 
 
 def _patch_torch_load_for_pyannote() -> None:
@@ -51,7 +51,7 @@ def _patch_torch_load_for_pyannote() -> None:
         return _orig_load(*args, **kwargs)
 
     _safe_load._pyannote_weights_only_patched = True  # type: ignore[attr-defined]
-    torch.load = _safe_load  # type: ignore[assignment]
+    torch.load = _safe_load
 
 
 def load_pyannote(hf_token: str | None) -> Any:
@@ -87,8 +87,8 @@ def run_pyannote(pipeline: Any, wav_path: str) -> list[tuple[str, float, float]]
     waveform shape 需為 ``(channels, samples)``；soundfile 回傳
     ``(samples, channels)``，需轉置。
     """
-    import soundfile as sf  # noqa: PLC0415
-    import torch  # noqa: PLC0415
+    import soundfile as sf
+    import torch
 
     data, sample_rate = sf.read(wav_path, dtype="float32", always_2d=True)
     waveform = torch.from_numpy(data.T).contiguous()
