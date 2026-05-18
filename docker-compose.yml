@@ -58,6 +58,11 @@ services:
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-100}
       MAX_DECODE_SIZE_MB: ${MAX_DECODE_SIZE_MB:-500}
       SUPPORTED_AUDIO_FORMATS: ${SUPPORTED_AUDIO_FORMATS:-wav,mp3,mp4,flac,aac,ogg,m4a}
+      # 語者分離（vendor profile）：HF_TOKEN 用於 pyannote 模型授權下載
+      # 留空時 DiarizationService 會跳過載入並在 log 留 warning，不阻止啟動
+      DIARIZATION_ENABLED: ${DIARIZATION_ENABLED:-true}
+      DIARIZATION_BACKEND: ${DIARIZATION_BACKEND:-pyannote}
+      HF_TOKEN: ${HF_TOKEN:-}
       # 佇列
       QUEUE_BATCH_MAX_SIZE: ${QUEUE_BATCH_MAX_SIZE:-20}
       QUEUE_REALTIME_MAX_SIZE: ${QUEUE_REALTIME_MAX_SIZE:-50}
