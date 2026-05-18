@@ -103,13 +103,14 @@ async def quality_websocket(
     try:
         while True:
             raw = await websocket.receive_text()
+            raw_size = len(raw.encode("utf-8"))
 
-            if len(raw.encode("utf-8")) > max_msg_bytes:
+            if raw_size > max_msg_bytes:
                 logger.warning(
                     "ws message too large",
                     api_key_id=api_key.id,
                     connection_id=connection_id,
-                    size_bytes=len(raw.encode("utf-8")),
+                    size_bytes=raw_size,
                 )
                 await websocket.close(code=1009, reason="WS_MESSAGE_TOO_LARGE")
                 return
@@ -117,7 +118,9 @@ async def quality_websocket(
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                await websocket.send_text(json.dumps({"error": "invalid json"}))
+                await websocket.send_text(
+                    json.dumps({"action": "error", "reason": "invalid_json"})
+                )
                 continue
 
             action = msg.get("action")
