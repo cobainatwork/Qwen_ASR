@@ -65,7 +65,7 @@ async def quality_websocket(
             required="asr:write",
             actual=scopes,
         )
-        await websocket.close(code=1008, reason="AUTH_SCOPE_INSUFFICIENT")
+        await websocket.close(code=1008, reason="AUTH_INSUFFICIENT_SCOPE")
         return
 
     # Subprotocol 在 accept 中回應，client 才會確認協商成功

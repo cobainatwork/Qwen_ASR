@@ -30,7 +30,7 @@ def test_app_exception_override() -> None:
     [
         (UnauthorizedError, "AUTH_INVALID_TOKEN", 401),
         (MissingBearerError, "AUTH_MISSING_BEARER", 401),
-        (ForbiddenError, "AUTH_SCOPE_INSUFFICIENT", 403),
+        (ForbiddenError, "AUTH_INSUFFICIENT_SCOPE", 403),
     ],
 )
 def test_subclass_defaults(exc_cls: type[AppException], code: str, status: int) -> None:

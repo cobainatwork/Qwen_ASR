@@ -142,3 +142,47 @@ def test_ws_stream_start_returns_unavailable(ws_app: tuple[FastAPI, str]) -> Non
             assert data["action"] == "stream.unavailable"
             assert isinstance(data.get("limitations"), list)
             assert any("timestamps" in lim for lim in data["limitations"])
+
+
+def test_ws_insufficient_scope_rejected(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Key 持有 asr:read 但缺 asr:write：scope 檢查失敗，close(1008)。"""
+    monkeypatch.setenv("API_KEY", "ws-scope-test")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@h/d")
+    monkeypatch.setenv("DB_PASSWORD", "p")
+    monkeypatch.setenv("THIRD_PARTY_LICENSE_ACK", "true")
+    monkeypatch.setenv("WS_MAX_CONNECTIONS_PER_KEY", "2")
+    monkeypatch.setenv("WS_HEARTBEAT_TIMEOUT_SEC", "3")
+    from app.core.config import get_settings
+    get_settings.cache_clear()
+
+    raw_token = "ws-readonly-token"
+    hmac_key = derive_hmac_key("ws-scope-test")
+    db_session.execute(text("DELETE FROM api_keys WHERE name = 'wsread'"))
+    db_session.execute(
+        text(
+            "INSERT INTO api_keys (key_hash, lookup_prefix, name, scopes) "
+            "VALUES (:h, :p, 'wsread', '{asr:read}')"
+        ),
+        {"h": hash_token(raw_token), "p": lookup_prefix(raw_token, hmac_key)},
+    )
+    db_session.commit()
+    try:
+        from app.routers.ws import router as ws_router
+        app = FastAPI()
+        register_exception_handlers(app)
+        app.include_router(ws_router)
+        app.dependency_overrides[get_db] = lambda: db_session
+
+        sub = ["asr.v1", f"bearer.{_b64url(raw_token)}"]
+        from starlette.websockets import WebSocketDisconnect
+        with TestClient(app) as client:
+            with pytest.raises(WebSocketDisconnect) as exc:
+                with client.websocket_connect("/ws/quality", subprotocols=sub) as ws:
+                    ws.receive_text()
+            assert exc.value.code == 1008
+    finally:
+        asyncio.run(WebSocketManager.reset_for_test())
+        db_session.execute(text("DELETE FROM api_keys WHERE name = 'wsread'"))
+        db_session.commit()

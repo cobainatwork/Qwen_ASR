@@ -47,7 +47,7 @@ def require_scope(scope: str) -> Callable[..., ApiKey]:
         if "admin" in api_key.scopes or scope in api_key.scopes:
             return api_key
         raise ForbiddenError(
-            code="AUTH_SCOPE_INSUFFICIENT",
+            code="AUTH_INSUFFICIENT_SCOPE",
             message=f"需要 scope: {scope}",
             details={"required": scope, "granted": list(api_key.scopes)},
         )

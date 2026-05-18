@@ -41,7 +41,7 @@ class MissingBearerError(AppException):
 
 
 class ForbiddenError(AppException):
-    code = "AUTH_SCOPE_INSUFFICIENT"
+    code = "AUTH_INSUFFICIENT_SCOPE"
     http_status = 403
     message = "權限不足"
 
@@ -287,7 +287,7 @@ ALL_ERROR_CODES: tuple[str, ...] = (
     "INTERNAL_ERROR",
     "AUTH_INVALID_TOKEN",
     "AUTH_MISSING_BEARER",
-    "AUTH_SCOPE_INSUFFICIENT",
+    "AUTH_INSUFFICIENT_SCOPE",
     "NOT_FOUND",
     "VALIDATION_ERROR",
     "AUDIO_MIME_INVALID",
