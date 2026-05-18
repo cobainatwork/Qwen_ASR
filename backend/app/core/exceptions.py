@@ -265,7 +265,7 @@ class CorrectionVersionMismatchError(AppException):
 
 # ----- Phase 2 / M10 -----
 class WsAuthFailedError(AppException):
-    code = "WS_AUTH_FAILED"
+    code = "AUTH_WS_PROTOCOL_INVALID"
     http_status = 401
     message = "WebSocket 認證失敗"
 
@@ -323,7 +323,7 @@ ALL_ERROR_CODES: tuple[str, ...] = (
     "YOUTUBE_FILE_TOO_LARGE",
     "CORRECTION_SESSION_NOT_FOUND",
     "CORRECTION_VERSION_MISMATCH",
-    "WS_AUTH_FAILED",
+    "AUTH_WS_PROTOCOL_INVALID",
     "WS_MAX_CONNECTIONS",
     "WS_MESSAGE_TOO_LARGE",
 )
