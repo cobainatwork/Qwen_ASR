@@ -32,11 +32,13 @@ def _patch_torch_load_for_pyannote() -> None:
     checkpoint 中的 ``torch.torch_version.TorchVersion`` 等 non-tensor 物件，
     拋 ``_pickle.UnpicklingError``。
 
-    解法：將 ``torch.load`` 預設 ``weights_only`` 改為 ``False``。pyannote
-    checkpoint 來自 huggingface.co/pyannote/speaker-diarization-3.1（trusted
-    upstream + 需 HF terms accept），符合 PyTorch 文件「trusted source」豁免
-    條件。Monkey-patch 限 process 生命週期；本專案啟動完成後不再有其他
-    ``torch.load`` 呼叫（vllm 用自家 loader、resampler 用 soundfile），無副作用。
+    解法：強制覆寫每次 ``torch.load`` 的 ``weights_only`` 參數為 ``False``。
+    必須是 **覆寫**（非 ``setdefault``），因為 lightning_fabric.cloud_io._load
+    會明確傳 ``weights_only=True``，setdefault 無法生效。pyannote checkpoint
+    來自 huggingface.co/pyannote/speaker-diarization-3.1（trusted upstream +
+    需 HF terms accept），符合 PyTorch 文件「trusted source」豁免條件。
+    Monkey-patch 限 process 生命週期；本專案啟動完成後不再有其他 ``torch.load``
+    呼叫（vllm 用自家 loader、resampler 用 soundfile），無副作用。
     """
     import torch
 
@@ -45,7 +47,7 @@ def _patch_torch_load_for_pyannote() -> None:
     _orig_load = torch.load
 
     def _safe_load(*args: Any, **kwargs: Any) -> Any:
-        kwargs.setdefault("weights_only", False)
+        kwargs["weights_only"] = False
         return _orig_load(*args, **kwargs)
 
     _safe_load._pyannote_weights_only_patched = True  # type: ignore[attr-defined]
