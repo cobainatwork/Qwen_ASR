@@ -62,10 +62,12 @@ class Settings(BaseSettings):
     HOTWORD_SHALLOW_FUSION_THRESHOLD: int = 100
     HOTWORD_CTC_WS_THRESHOLD: int = 1000
 
-    # ----- Phase 2 / M7 -----
-    ALIGNER_ENABLED: bool = True
+    # ----- Phase 2 / M7 — Offline Aligner Tool（非主流程）-----
+    # ALIGNER_ENABLED：僅控制 offline 批次校正 AlignerService 是否啟用；
+    # transcribe 主流程不依賴本旗標（ForcedAligner 已內建於 ASR 引擎 §3.3.2）。
+    ALIGNER_ENABLED: bool = False
     ALIGNER_MODEL_PATH: Path = Path("/data/models/Qwen3-ForcedAligner-0.6B")
-    ALIGNER_MAX_DURATION_SEC: int = 300  # 5 分鐘
+    ALIGNER_MAX_DURATION_SEC: int = 300  # 5 分鐘（offline 批次校正限制）
 
     # ----- M4-revisit: Qwen3-ForcedAligner 內建於 Qwen3ASRModel.LLM (v1.10 §3.3.2) -----
     FORCED_ALIGNER_MODEL: str = "Qwen/Qwen3-ForcedAligner-0.6B"

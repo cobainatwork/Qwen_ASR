@@ -3,6 +3,21 @@
 切段限制：5 分鐘（規格 §3.3.2）。長音檔分段處理，回傳 list[WordTimestamp]。
 """
 
+# ---------------------------------------------------------------------------
+# DEPRECATED 主流程依賴（M4-revisit 2026-05-18）
+#
+# ForcedAligner 已內建於 Qwen3ASRModel.LLM（qwen-asr 套件），
+# transcribe 主流程直接從 result.time_stamps 取得對齊結果。
+#
+# 本模組僅保留為 **offline 批次校正工具**（規格 v1.10 §3.3.2 歷史保留說明）：
+# - 使用場景：批次校正工作台需要對長音檔做精細詞級對齊時
+# - 啟用控制：ALIGNER_ENABLED=True（預設 False）
+# - 切段限制：5 分鐘（ALIGNER_MAX_DURATION_SEC=300）
+#
+# 若您在 transcribe pipeline 看到對此模組的直接呼叫，屬於 bug。
+# ---------------------------------------------------------------------------
+
+
 from __future__ import annotations
 
 import asyncio

@@ -49,22 +49,16 @@ def _configure_app(settings: Settings) -> FastAPI:
 
         # 載入 vLLM
         try:
-            await AsrEngineManager.initialize(settings)
+            AsrEngineManager.initialize(settings)
         except RuntimeError as e:
             if settings.ENV == "production":
                 raise
-            logger.warning("vLLM initialize skipped (development)", error=str(e))
+            logger.warning("qwen-asr initialize skipped (development)", error=str(e))
+        # 注意：ForcedAligner 已內建於 Qwen3ASRModel.LLM（qwen-asr §3.3.2）
+        # AlignerService 不再在 lifespan 載入；offline 批次校正由 ALIGNER_ENABLED 控制
 
-        # M7：載入 Aligner / Diarization（dev 容忍 ImportError）
-        if settings.ALIGNER_ENABLED:
-            try:
-                from app.services.aligner import AlignerService
-                AlignerService.load(settings)
-            except RuntimeError as e:
-                if settings.ENV == "production":
-                    raise
-                logger.warning("AlignerService load skipped (development)", error=str(e))
-
+        # M7：載入 Diarization（dev 容忍 ImportError）
+        # AlignerService 已不在 lifespan 載入（v1.10 §3.3.2），由 ALIGNER_ENABLED 控制 offline 批次校正
         if settings.DIARIZATION_ENABLED:
             try:
                 from app.services.diarization import DiarizationService
@@ -100,7 +94,7 @@ def _configure_app(settings: Settings) -> FastAPI:
         yield
 
         await consumer.stop()
-        await AsrEngineManager.shutdown()
+        AsrEngineManager.shutdown()
         logger.info("backend lifespan stop")
 
     app = FastAPI(
