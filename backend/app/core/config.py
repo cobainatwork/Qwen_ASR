@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     ALIGNER_MODEL_PATH: Path = Path("/data/models/Qwen3-ForcedAligner-0.6B")
     ALIGNER_MAX_DURATION_SEC: int = 300  # 5 分鐘
 
+    # ----- M4-revisit: Qwen3-ForcedAligner 內建於 Qwen3ASRModel.LLM (v1.10 §3.3.2) -----
+    FORCED_ALIGNER_MODEL: str = "Qwen/Qwen3-ForcedAligner-0.6B"
+    FORCED_ALIGNER_DEVICE: str = "cuda:0"
+    FORCED_ALIGNER_DTYPE: Literal["bfloat16", "float16", "float32"] = "bfloat16"
+
     DIARIZATION_ENABLED: bool = True
     DIARIZATION_BACKEND: Literal["pyannote", "campp"] = "pyannote"
 
