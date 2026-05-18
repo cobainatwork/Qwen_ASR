@@ -54,7 +54,7 @@ services:
       # 音檔處理
       AUDIO_STORAGE_DIR: /data/audio
       VAD_ENABLED: ${VAD_ENABLED:-true}
-      VAD_MODEL_PATH: /data/models/FireRedVAD/model.bin
+      VAD_MODEL_DIR: /data/models/FireRedVAD
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-100}
       MAX_DECODE_SIZE_MB: ${MAX_DECODE_SIZE_MB:-500}
       SUPPORTED_AUDIO_FORMATS: ${SUPPORTED_AUDIO_FORMATS:-wav,mp3,mp4,flac,aac,ogg,m4a}

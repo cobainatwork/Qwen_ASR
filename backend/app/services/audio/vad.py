@@ -30,11 +30,13 @@ class FireRedVADService:
     _model: _VadEngine | None = None
 
     @classmethod
-    def load(cls, model_path: Path) -> None:
-        """載入 FireRedVAD 權重。Phase 1 接受任意 _VadEngine 實作。"""
+    def load(cls, model_dir: Path) -> None:
+        """載入 FireRedVAD 權重目錄。fireredvad 0.0.2 的 ``from_pretrained``
+        接受**目錄**（含 ``cmvn.ark`` + DetectModel 權重），不是單一檔案。
+        """
         from app.services.audio._firered_vad_loader import load_firered_vad  # 延遲 import
 
-        cls._model = load_firered_vad(model_path)
+        cls._model = load_firered_vad(model_dir)
 
     @classmethod
     def set_model(cls, model: _VadEngine | None) -> None:

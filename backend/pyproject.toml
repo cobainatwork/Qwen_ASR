@@ -50,6 +50,10 @@ audio = [
   "soxr>=0.5.0",
   "soundfile>=0.12.1",
   "numpy>=1.26.0",
+  # FireRedVAD（v1.10 §3.3.3）：PyPI 套件名為小寫無底線的 fireredvad。
+  # 模型權重不隨套件分發，需從 FireRedTeam 倉庫的 pretrained_models/FireRedVAD/VAD
+  # 取得後掛入 VAD_MODEL_DIR；container 內缺檔時 development 容忍降級。
+  "fireredvad>=0.0.2,<0.1",
 ]
 gpu = [
   # qwen-asr 官方套件（M4-revisit 改採），[vllm] extra 自帶 vllm==0.14.0
@@ -115,7 +119,7 @@ warn_return_any = true
 files = ["app"]
 
 [[tool.mypy.overrides]]
-module = ["torchaudio.*", "soxr.*", "soundfile.*", "magic.*", "vllm.*", "qwen_asr.*", "argon2.*"]
+module = ["torchaudio.*", "soxr.*", "soundfile.*", "magic.*", "vllm.*", "qwen_asr.*", "argon2.*", "fireredvad.*"]
 ignore_missing_imports = true
 
 # ---------------- pytest ----------------

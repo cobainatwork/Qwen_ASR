@@ -41,7 +41,7 @@ def _configure_app(settings: Settings) -> FastAPI:
         # 載入 VAD（Phase 1 必載）
         if settings.VAD_ENABLED:
             try:
-                FireRedVADService.load(settings.VAD_MODEL_PATH)
+                FireRedVADService.load(settings.VAD_MODEL_DIR)
             except RuntimeError as e:
                 if settings.ENV == "production":
                     raise

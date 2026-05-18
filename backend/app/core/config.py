@@ -38,7 +38,10 @@ class Settings(BaseSettings):
     # ----- 音檔處理 -----
     AUDIO_STORAGE_DIR: Path = Path("/data/audio")
     VAD_ENABLED: bool = True
-    VAD_MODEL_PATH: Path = Path("/data/models/FireRedVAD/model.bin")
+    # fireredvad 0.0.2 的 FireRedVad.from_pretrained 接受**目錄**而非單一檔案，
+    # 目錄需含 cmvn.ark + DetectModel 權重；從 FireRedTeam GitHub 倉庫的
+    # pretrained_models/FireRedVAD/VAD 取得後掛入此路徑。
+    VAD_MODEL_DIR: Path = Path("/data/models/FireRedVAD")
     MAX_UPLOAD_SIZE_MB: int = 100
     MAX_DECODE_SIZE_MB: int = 500
     SUPPORTED_AUDIO_FORMATS: str = "wav,mp3,mp4,flac,aac,ogg,m4a"
