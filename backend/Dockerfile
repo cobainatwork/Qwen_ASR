@@ -95,6 +95,12 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 COPY --chown=asr:asr app /app/app
 COPY --chown=asr:asr pyproject.toml /app/pyproject.toml
+# 容器啟動時自動跑 alembic upgrade head —— migrations 失敗 → entrypoint exit 非零 →
+# compose restart loop 暴露錯誤。alembic.ini sqlalchemy.url 為 placeholder，env.py
+# 會以 DATABASE_URL 環境變數覆寫，無需 build 時注入連線字串。
+COPY --chown=asr:asr alembic.ini /app/alembic.ini
+COPY --chown=asr:asr alembic /app/alembic
+COPY --chown=asr:asr --chmod=755 scripts/entrypoint.sh /app/entrypoint.sh
 
 USER asr
 
@@ -104,6 +110,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -fsS http://localhost:8000/health || exit 1
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
+# tini 為 PID 1，entrypoint.sh 在跑完 `alembic upgrade head` 後 `exec "$@"` 把
+# 控制權轉給 CMD（uvicorn），確保 SIGTERM 等信號正確 forward 到 worker。
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]
 # workers=1 強制：規格 3.1、3.3.7、7.2 節要求
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
