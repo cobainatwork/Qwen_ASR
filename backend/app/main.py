@@ -20,6 +20,7 @@ from app.routers.asr import router as asr_router
 from app.routers.dataset import router as dataset_router
 from app.routers.health import router as health_router
 from app.routers.hotword import router as hotword_router
+from app.routers.ws import router as ws_router
 from app.services.asr.consumer import AsrConsumer
 from app.services.asr.engine import AsrEngineManager
 from app.services.asr.queue import AsyncioQueueBackend
@@ -125,6 +126,7 @@ def _configure_app(settings: Settings) -> FastAPI:
     app.include_router(asr_router)
     app.include_router(hotword_router)
     app.include_router(dataset_router)
+    app.include_router(ws_router)
 
     if settings.DEPLOYMENT_PROFILE == "vendor":
         from app.routers.correction import router as correction_router
