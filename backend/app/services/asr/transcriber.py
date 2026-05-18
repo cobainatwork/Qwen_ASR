@@ -54,16 +54,21 @@ def _parse_timestamps(
 def _load_wav_as_numpy(storage_path: str) -> tuple[Any, int]:
     """讀取 WAV 檔案，回傳 (numpy ndarray, sample_rate)。
 
-    音檔經 M3 預處理管線後保證為 16kHz mono WAV。使用 torchaudio 讀取後轉
-    numpy（shape: [samples]）以符合 qwen-asr transcribe(audio=[(np, sr)]) 介面。
+    音檔經 M3 預處理管線後保證為 16kHz mono WAV。使用 soundfile（libsndfile）
+    讀取，避開 torchaudio 2.9.x 委派給 torchcodec 時觸發的 C++ std::length_error
+    崩潰（torchcodec 與 ffmpeg 5.1 / slim-bookworm 的 ABI 不相容）。
+
+    輸出 float32 ndarray（shape: [samples]）以符合 qwen-asr
+    transcribe(audio=[(np, sr)]) 介面。
     """
     import numpy as np  # noqa: PLC0415
-    import torchaudio  # noqa: PLC0415
+    import soundfile as sf  # noqa: PLC0415
 
-    waveform, sample_rate = torchaudio.load(storage_path)
-    # waveform shape: [channels, samples]；取第一聲道
-    wav_np: np.ndarray = waveform[0].numpy()
-    return wav_np, sample_rate
+    wav, sample_rate = sf.read(storage_path, dtype="float32", always_2d=False)
+    # mono WAV: shape (samples,)；stereo: (samples, 2) — 取第一聲道
+    if wav.ndim == 2:
+        wav = wav[:, 0]
+    return np.ascontiguousarray(wav, dtype=np.float32), int(sample_rate)
 
 
 class Transcriber:
