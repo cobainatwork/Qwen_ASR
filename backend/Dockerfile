@@ -17,6 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libmagic1 \
         ffmpeg \
         libpq-dev \
+        cmake \
+        libboost-system-dev \
+        libboost-thread-dev \
+        libboost-program-options-dev \
+        libboost-test-dev \
+        git \
     && rm -rf /var/lib/apt/lists/*
 
 # ============================================================

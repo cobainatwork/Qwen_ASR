@@ -52,9 +52,11 @@ audio = [
   "numpy>=1.26.0",
 ]
 gpu = [
-  # vLLM 與 GPU 推理（M4 起使用）；CPU CI 不安裝
-  # 鎖 0.19.x 系列（穩定相容 torch 2.8-2.9 + cu126/cu128，匹配 driver R570）
-  "vllm>=0.19.0,<0.20",
+  # qwen-asr 官方套件（M4-revisit 改採），[vllm] extra 自帶 vllm==0.14.0
+  # 不在此處直接約束 vllm 版本，讓 qwen-asr[vllm] 的 dependency resolver 決定
+  "qwen-asr[vllm]>=0.0.6,<0.1",
+  # FlashAttention 2（bfloat16 推理加速）；build 需 CUDA toolkit
+  "flash-attn>=2.0.0,<3.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -101,7 +103,7 @@ warn_return_any = true
 files = ["app"]
 
 [[tool.mypy.overrides]]
-module = ["torchaudio.*", "soxr.*", "soundfile.*", "magic.*", "vllm.*", "argon2.*"]
+module = ["torchaudio.*", "soxr.*", "soundfile.*", "magic.*", "vllm.*", "qwen_asr.*", "argon2.*"]
 ignore_missing_imports = true
 
 # ---------------- pytest ----------------
