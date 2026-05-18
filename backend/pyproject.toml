@@ -90,7 +90,8 @@ select = [
   "RUF",          # ruff-specific
 ]
 ignore = [
-  "S101",     # pytest 內使用 assert
+  # S101（assert）已從全域 ignore 移至 tests/ per-file-ignores —— 生產碼禁止使用
+  # `assert`（編譯時 -O 會被優化掉，無法做為實際 invariant 檢查；改用 raise）。
   "RUF001",   # 中文字串內全形標點（繁體中文專案合理排除）
   "RUF002",   # 中文 docstring 內全形標點（繁體中文專案合理排除）
   "RUF003",   # 中文註解內全形標點（繁體中文專案合理排除）
@@ -99,7 +100,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S105", "S106", "S108", "S311"]  # 測試中允許 hardcoded password、tmp 路徑、隨機
+# 測試中允許 hardcoded password、tmp 路徑、隨機、assert（pytest 慣用語）
+"tests/**/*.py" = ["S101", "S105", "S106", "S108", "S311"]
 "app/deps/*.py" = ["B008"]  # FastAPI Depends/Header 在函式預設值是框架慣用語
 "app/routers/*.py" = ["B008"]  # FastAPI File/Form/Depends 在路由函式預設值是框架慣用語
 
@@ -133,6 +135,12 @@ source = ["app"]
 branch = true
 
 [tool.coverage.report]
+# fail_under=70 為 Phase 1 啟用閾值（保留 buffer 給驗證型整合測試與 mock 邊界）。
+# 目標：Phase 2 全模組落地後（M11 結束）升至 80%。升 80% 前須補：
+#   * repositories/base.py（PHASE1-OPT-05 整合測試覆蓋 66 → 90%）
+#   * routers 錯誤分支與例外處理路徑單元測試
+#   * services/correction/* 與 services/finetune/* 邊緣 case
+# 升閾值前一律先靠補測試，禁止為了過閾值降低 branch=true 嚴格度。
 fail_under = 70
 show_missing = true
 skip_covered = false
