@@ -1,4 +1,6 @@
 import asyncio
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 from app.core.exceptions import AsrRequestTimeoutError
@@ -9,27 +11,34 @@ from app.services.asr.queue import AsrJob, AsyncioQueueBackend, QueuePriority
 from sqlalchemy.orm import Session
 
 
-class _MockEngine:
-    def __init__(self, output: dict | Exception) -> None:
+class _MockAsrModel:
+    """仿 Qwen3ASRModel.LLM 的 mock：transcribe 為同步方法（qwen-asr 0.0.6 介面）。"""
+
+    def __init__(self, output: Any | Exception) -> None:
         self.output = output
 
-    async def generate(self, **kwargs):  # type: ignore[no-untyped-def]
+    def transcribe(self, audio: Any, **kwargs: Any) -> list[Any]:  # noqa: ARG002
         if isinstance(self.output, Exception):
             raise self.output
-        return self.output
+        return [self.output]
 
-    async def abort_all(self) -> None:
-        return None
+
+def _make_mock_result(text: str = "hello", language: str = "en") -> Any:
+    """建立仿 qwen-asr TranscriptionResult 的 mock 物件。"""
+    result = MagicMock()
+    result.text = text
+    result.language = language
+    result.time_stamps = None
+    return result
 
 
 @pytest.fixture(autouse=True)
-def _reset_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+def _reset_engine(monkeypatch: pytest.MonkeyPatch) -> Any:
     """每個測試前重置 engine，並注入最小 Settings 使後處理階段全數關閉。"""
     import app.core.config as _config_mod
     from app.core.config import Settings
 
-    _original_get_settings = _config_mod.get_settings
-    _original_get_settings.cache_clear()
+    _config_mod.get_settings.cache_clear()
 
     fake_settings = Settings(
         API_KEY="unit-test",
@@ -46,10 +55,10 @@ def _reset_engine(monkeypatch: pytest.MonkeyPatch) -> None:
     )  # type: ignore[call-arg]
     monkeypatch.setattr("app.core.config.get_settings", lambda: fake_settings)
 
-    AsrEngineManager.set_engine_for_test(None, model_version="unknown")
+    AsrEngineManager.set_asr_for_test(None, model_version="unknown")
     yield
-    AsrEngineManager.set_engine_for_test(None, model_version="unknown")
-    _original_get_settings.cache_clear()
+    AsrEngineManager.set_asr_for_test(None, model_version="unknown")
+    _config_mod.get_settings.cache_clear()
 
 
 @pytest.mark.asyncio
@@ -58,7 +67,6 @@ async def test_consumer_processes_job(
 ) -> None:
     # 注入測試用 session factory：patch consumer 模組內已 import 的 get_session_factory
     # consumer._run() 呼叫鏈：SessionLocal = get_session_factory()；with SessionLocal() as db
-    # get_session_factory 需回傳 callable，該 callable 回傳 context manager（包裝 db_session）
     from contextlib import contextmanager
 
     import app.services.asr.consumer as consumer_module
@@ -78,8 +86,10 @@ async def test_consumer_processes_job(
     afr.update_after_resample(af.id, original_sample_rate=16000, duration_sec=2.0)
     db_session.commit()
 
-    AsrEngineManager.set_engine_for_test(
-        _MockEngine({"text": "hello", "timestamps": None}), model_version="MOCK"
+    # 注入 mock ASR：transcribe 回傳 mock TranscriptionResult
+    AsrEngineManager.set_asr_for_test(
+        _MockAsrModel(_make_mock_result(text="hello", language="en")),
+        model_version="MOCK",
     )
 
     q = AsyncioQueueBackend(realtime_max=5, batch_max=5)
@@ -93,7 +103,14 @@ async def test_consumer_processes_job(
         future=asyncio.get_event_loop().create_future(),
     )
     await q.enqueue(job, QueuePriority.BATCH)
-    transcription_id = await wait_for_job(job, timeout=10.0)
+
+    # Patch _load_wav_as_numpy：mock audio file 不需實際存在
+    with patch(
+        "app.services.asr.transcriber._load_wav_as_numpy",
+        return_value=(MagicMock(), 16000),
+    ):
+        transcription_id = await wait_for_job(job, timeout=10.0)
+
     assert transcription_id > 0
 
     await consumer.stop()
