@@ -207,3 +207,6 @@ $RECYCLE.BIN/
 docs/superpowers/specs/_append_*
 docs/superpowers/specs/*_draft.md
 docs/superpowers/specs/*_wip.md
+
+# M4-revisit: HF model cache + downloaded weights
+.data/
