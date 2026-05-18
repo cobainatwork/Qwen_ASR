@@ -35,18 +35,50 @@ def _get_dtype_map() -> dict[str, Any]:
     return _DTYPE_MAP
 
 
-def compute_model_version(model_dir: Path) -> str:
+def compute_model_version(cache_dir: Path, repo_id: str) -> str:
     """產生模型版本字串。優先序：
-    1. {model_dir}/version.json 內的 `version` 欄位
-    2. {model_dir}/model.safetensors 的 SHA256 前 8 字元
-    3. fallback "{model_dir.name}@unknown"
+    1. HF hub cache：``{cache_dir}/models--{org}--{name}/refs/main`` commit SHA 前 12 字元
+    2. Legacy local：``{cache_dir}/{repo_id 底線版}/version.json`` 的 ``version`` 欄位
+    3. Legacy local：``{cache_dir}/{repo_id 底線版}/model.safetensors`` SHA256 前 8 字元
+    4. fallback ``{repo_id 底線版}@unknown``
+
+    HF hub cache 是預設下載路徑（``download_dir`` 傳給 qwen-asr / vLLM），
+    sharded model 沒有單一 ``model.safetensors``，所以舊版直接讀 weights 的
+    路徑會 fallback 到 ``@unknown``（GPU smoke 確認）。
     """
+    safe_name = repo_id.replace("/", "_")
+    hf_short = _hf_cache_revision(cache_dir, repo_id)
+    if hf_short:
+        return f"{safe_name}@{hf_short}"
+
+    legacy_short = _legacy_local_version(cache_dir / safe_name)
+    if legacy_short:
+        return f"{safe_name}@{legacy_short}"
+
+    return f"{safe_name}@unknown"
+
+
+def _hf_cache_revision(cache_dir: Path, repo_id: str) -> str | None:
+    """讀 HF hub cache 的 ``refs/main`` 並回傳前 12 字元 commit SHA。"""
+    hf_repo = cache_dir / f"models--{repo_id.replace('/', '--')}"
+    refs_main = hf_repo / "refs" / "main"
+    if not refs_main.is_file():
+        return None
+    try:
+        commit_sha = refs_main.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return commit_sha[:12] or None
+
+
+def _legacy_local_version(model_dir: Path) -> str | None:
+    """讀 legacy 本地路徑：``version.json`` 優先於 ``model.safetensors`` SHA256。"""
     version_file = model_dir / "version.json"
     if version_file.is_file():
         try:
             data = json.loads(version_file.read_text(encoding="utf-8"))
             if isinstance(data, dict) and "version" in data:
-                return f"{model_dir.name}@{data['version']}"
+                return str(data["version"])
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -56,9 +88,9 @@ def compute_model_version(model_dir: Path) -> str:
         with weights.open("rb") as f:
             while chunk := f.read(1024 * 1024):
                 h.update(chunk)
-        return f"{model_dir.name}@{h.hexdigest()[:8]}"
+        return h.hexdigest()[:8]
 
-    return f"{model_dir.name}@unknown"
+    return None
 
 
 class AsrEngineManager:
@@ -107,8 +139,9 @@ class AsrEngineManager:
             download_dir=str(settings.MODEL_CACHE_DIR),
         )
 
-        model_dir = settings.MODEL_CACHE_DIR / settings.ASR_MODEL.replace("/", "_")
-        cls._model_version = compute_model_version(model_dir)
+        cls._model_version = compute_model_version(
+            settings.MODEL_CACHE_DIR, settings.ASR_MODEL
+        )
         logger.info("ASR engine initialized", model_version=cls._model_version)
 
     @classmethod

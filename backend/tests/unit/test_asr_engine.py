@@ -11,36 +11,68 @@ from app.core.exceptions import AsrEngineUnavailableError
 from app.services.asr.engine import AsrEngineManager, compute_model_version
 
 
-# ── compute_model_version（不動，保留原有測試邏輯）──────────────────────────
+# ── compute_model_version（HF cache 優先 → legacy → fallback）──────────────
+
+_REPO_ID = "Qwen/Qwen3-ASR-1.7B"
+_SAFE = "Qwen_Qwen3-ASR-1.7B"
+
+
+def _make_hf_refs_main(cache_dir: Path, repo_id: str, commit_sha: str) -> None:
+    refs = cache_dir / f"models--{repo_id.replace('/', '--')}" / "refs"
+    refs.mkdir(parents=True, exist_ok=True)
+    (refs / "main").write_text(commit_sha)
+
+
+def test_compute_model_version_from_hf_cache_refs_main(tmp_path: Path) -> None:
+    """HF cache layout：取 refs/main commit SHA 前 12 字元。"""
+    _make_hf_refs_main(tmp_path, _REPO_ID, "7278e1e70fe206f11671096ffdd38061171dd6e5")
+    assert compute_model_version(tmp_path, _REPO_ID) == f"{_SAFE}@7278e1e70fe2"
+
+
+def test_compute_model_version_hf_cache_priority_over_legacy(tmp_path: Path) -> None:
+    """HF cache 與 legacy 同時存在時，優先取 HF cache。"""
+    _make_hf_refs_main(tmp_path, _REPO_ID, "abc123def456789abc")
+    legacy = tmp_path / _SAFE
+    legacy.mkdir()
+    (legacy / "version.json").write_text(json.dumps({"version": "legacy"}))
+    assert compute_model_version(tmp_path, _REPO_ID) == f"{_SAFE}@abc123def456"
+
+
+def test_compute_model_version_hf_refs_main_empty_falls_back(tmp_path: Path) -> None:
+    """refs/main 存在但內容空字串時 fallback 到 legacy / unknown。"""
+    _make_hf_refs_main(tmp_path, _REPO_ID, "")
+    assert compute_model_version(tmp_path, _REPO_ID) == f"{_SAFE}@unknown"
 
 
 def test_compute_model_version_from_version_json(tmp_path: Path) -> None:
-    model_dir = tmp_path / "model"
-    model_dir.mkdir()
-    (model_dir / "version.json").write_text(json.dumps({"version": "2026-04-01"}))
-    assert compute_model_version(model_dir) == "model@2026-04-01"
+    """Legacy local：{cache_dir}/{safe_name}/version.json。"""
+    legacy = tmp_path / _SAFE
+    legacy.mkdir()
+    (legacy / "version.json").write_text(json.dumps({"version": "2026-04-01"}))
+    assert compute_model_version(tmp_path, _REPO_ID) == f"{_SAFE}@2026-04-01"
 
 
 def test_compute_model_version_from_safetensors(tmp_path: Path) -> None:
-    model_dir = tmp_path / "model"
-    model_dir.mkdir()
-    (model_dir / "model.safetensors").write_bytes(b"fake-weights")
-    v = compute_model_version(model_dir)
-    assert v.startswith("model@")
+    """Legacy local：{cache_dir}/{safe_name}/model.safetensors SHA256 前 8 字元。"""
+    legacy = tmp_path / _SAFE
+    legacy.mkdir()
+    (legacy / "model.safetensors").write_bytes(b"fake-weights")
+    v = compute_model_version(tmp_path, _REPO_ID)
+    assert v.startswith(f"{_SAFE}@")
     assert len(v.split("@")[1]) == 8
 
 
 def test_compute_model_version_fallback(tmp_path: Path) -> None:
-    model_dir = tmp_path / "model"
-    model_dir.mkdir()
-    assert compute_model_version(model_dir) == "model@unknown"
+    """任何 source 都不存在時 fallback 為 @unknown。"""
+    assert compute_model_version(tmp_path, _REPO_ID) == f"{_SAFE}@unknown"
 
 
 def test_compute_model_version_invalid_json_fallbacks(tmp_path: Path) -> None:
-    model_dir = tmp_path / "model"
-    model_dir.mkdir()
-    (model_dir / "version.json").write_text("{ not-valid-json")
-    assert compute_model_version(model_dir) == "model@unknown"
+    """version.json 損壞 + 無 safetensors + 無 HF cache → @unknown。"""
+    legacy = tmp_path / _SAFE
+    legacy.mkdir()
+    (legacy / "version.json").write_text("{ not-valid-json")
+    assert compute_model_version(tmp_path, _REPO_ID) == f"{_SAFE}@unknown"
 
 
 # ── AsrEngineManager 新介面 ──────────────────────────────────────────────────
