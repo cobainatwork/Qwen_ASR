@@ -1,8 +1,8 @@
 """
-transcribe 端點端對端整合測試（mock vLLM）。
+transcribe 端點端對端整合測試（mock qwen-asr 引擎）。
 
 注入策略：
-- _MockEngine 取代 vLLM AsyncLLMEngine
+- _MockAsrModel 取代 Qwen3ASRModel.LLM（qwen-asr 0.0.6 介面）
 - _FakeVadModel 取代 FireRedVAD
 - monkeypatch 替換 app.routers.asr.wait_for_job，讓 Transcriber.run()
   直接在測試 event loop 內以 db_session 執行（無需 AsrConsumer background task）
@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -38,14 +40,15 @@ from app.services.audio.vad import FireRedVADService
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "audio"
 
 
-class _MockEngine:
-    """vLLM AsyncLLMEngine 替身：固定回傳測試文字。"""
+class _MockAsrModel:
+    """Qwen3ASRModel.LLM 替身（qwen-asr 0.0.6 介面）：transcribe 為同步方法。"""
 
-    async def generate(self, **kwargs) -> dict:  # type: ignore[no-untyped-def]
-        return {"text": "你好世界，這是測試辨識結果。", "timestamps": None}
-
-    async def abort_all(self) -> None:
-        return None
+    def transcribe(self, audio: Any, **kwargs: Any) -> list[Any]:  # noqa: ARG002
+        result = MagicMock()
+        result.text = "你好世界，這是測試辨識結果。"
+        result.language = "Chinese"
+        result.time_stamps = None
+        return [result]
 
 
 class _FakeVadModel:
@@ -96,8 +99,8 @@ def app_with_asr(
     )
     db_session.commit()
 
-    # 注入 mock engine / VAD
-    AsrEngineManager.set_engine_for_test(_MockEngine(), model_version="MOCK@TEST")
+    # 注入 mock ASR / VAD
+    AsrEngineManager.set_asr_for_test(_MockAsrModel(), model_version="MOCK@TEST")
     FireRedVADService.set_model(_FakeVadModel())
 
     # patch wait_for_job：改為直接在 event loop 內執行 Transcriber
@@ -122,7 +125,7 @@ def app_with_asr(
     yield app, raw_token
 
     # 清理
-    AsrEngineManager.set_engine_for_test(None)
+    AsrEngineManager.set_asr_for_test(None)
     FireRedVADService.set_model(None)
 
 
@@ -152,7 +155,7 @@ def test_transcribe_endpoint_returns_text(app_with_asr: tuple[FastAPI, str]) -> 
 
 @pytest.mark.timeout(60)
 def test_transcribe_warns_unsupported_options(app_with_asr: tuple[FastAPI, str]) -> None:
-    """傳入 diarization / nec_enabled → 回應 warnings 包含相應欄位名稱。"""
+    """傳入 nec_enabled → warnings 應包含 nec_enabled；diarization 不再列為 unsupported。"""
     app, token = app_with_asr
     with TestClient(app) as client:
         with (FIXTURES / "valid_16k_mono.wav").open("rb") as f:
@@ -169,8 +172,49 @@ def test_transcribe_warns_unsupported_options(app_with_asr: tuple[FastAPI, str])
     assert resp.status_code == 200, resp.text
     body = resp.json()
     warnings = body["data"]["warnings"]
-    assert any("diarization" in w for w in warnings)
     assert any("nec_enabled" in w for w in warnings)
+    # diarization 由 settings 控制（M7 起支援），不應再列為「Phase 1 不支援」
+    assert not any("diarization" in w for w in warnings), warnings
+
+
+@pytest.mark.timeout(60)
+def test_transcribe_surfaces_diarization(
+    app_with_asr: tuple[FastAPI, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DIARIZATION_ENABLED=True 時，response 暴露 speakers list 與 diarization.backend。"""
+    from app.core.config import get_settings
+    from app.services.diarization import DiarizationService
+
+    monkeypatch.setattr(
+        "app.services.diarization._pyannote.run_pyannote",
+        lambda _p, _w: [("SPK_00", 0.0, 0.5), ("SPK_01", 0.5, 1.0)],
+    )
+    DiarizationService.set_backends_for_test(
+        pyannote=object(),  # 佔位，實際呼叫已被 monkeypatch 攔截
+        settings=get_settings(),
+    )
+    try:
+        app, token = app_with_asr
+        with TestClient(app) as client:
+            with (FIXTURES / "valid_16k_mono.wav").open("rb") as f:
+                resp = client.post(
+                    "/api/v1/asr/transcribe",
+                    files={"file": ("a.wav", f, "audio/wav")},
+                    data={"options_json": json.dumps({"return_timestamps": False})},
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()["data"]
+        speakers = body["speakers"]
+        assert speakers is not None and len(speakers) == 2
+        assert speakers[0] == {"speaker": "SPK_00", "start": 0.0, "end": 0.5}
+        assert body["diarization"] == {
+            "status": "ok",
+            "backend": "pyannote",
+            "speakers_count": 2,
+        }
+    finally:
+        DiarizationService.set_backends_for_test(None, None, None)
 
 
 @pytest.mark.timeout(60)

@@ -22,11 +22,25 @@ class Timestamp(BaseModel):
     end: float
 
 
+class SpeakerTurn(BaseModel):
+    speaker: str
+    start: float
+    end: float
+
+
+class DiarizationInfo(BaseModel):
+    status: str
+    backend: str | None = None
+    speakers_count: int | None = None
+
+
 class TranscribeData(BaseModel):
     transcription_id: int
     audio_file_id: int
     text: str
     timestamps: list[Timestamp] | None = None
+    speakers: list[SpeakerTurn] | None = None
+    diarization: DiarizationInfo | None = None
     language: str | None = None
     duration_sec: float
     processing_duration_sec: float
@@ -36,8 +50,8 @@ class TranscribeData(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+# diarization 由 settings.DIARIZATION_ENABLED 控制（M7 起支援），不再列入「Phase 1 不支援」。
 _UNSUPPORTED_FIELDS = (
-    "diarization",
     "post_processing",
     "denoise_enabled",
     "nec_enabled",

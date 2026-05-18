@@ -16,3 +16,11 @@
 | `empty.wav` | 空檔案 |
 
 `.gitattributes` 已將 `*.wav` 標為 binary，避免行尾轉換破壞檔案。
+
+## diarization 端到端 smoke
+
+`smoke_asr.sh --require-diarization` 需要**真正多人對話音檔**：上列 fixture 全為合成正弦波或靜音，pyannote 不會偵測為 speech。Linux GPU 環境執行時請另行準備（例如 LibriVox/CommonVoice CC 授權片段或自錄雙人對話）：
+
+    ./scripts/smoke_asr.sh /path/to/conversation_16k.wav --require-diarization
+
+assertion 通過條件：`response.data.diarization.status == "ok"` 且 `speakers` 至少一段。

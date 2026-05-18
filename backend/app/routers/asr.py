@@ -15,6 +15,8 @@ from app.deps.db import get_db
 from app.models import ApiKey
 from app.repositories.audio_file import AudioFileRepository
 from app.schemas.asr import (
+    DiarizationInfo,
+    SpeakerTurn,
     Timestamp,
     TranscribeData,
     TranscribeOptions,
@@ -119,12 +121,28 @@ async def transcribe(
     timestamps = (
         [Timestamp(**t) for t in rec.timestamps] if rec.timestamps else None
     )
+    speakers = (
+        [SpeakerTurn(**s) for s in rec.speakers] if rec.speakers else None
+    )
+    diarization_meta = (rec.post_processing or {}).get("diarization")
+    diarization_info = (
+        DiarizationInfo(
+            status=diarization_meta.get("status", "unknown"),
+            backend=diarization_meta.get("backend"),
+            # JSONB key 為 "speakers"（int），對應 schema 的 speakers_count
+            speakers_count=diarization_meta.get("speakers"),
+        )
+        if isinstance(diarization_meta, dict)
+        else None
+    )
     return success(
         TranscribeData(
             transcription_id=rec.id,
             audio_file_id=audio.id,
             text=rec.transcript_text or "",
             timestamps=timestamps,
+            speakers=speakers,
+            diarization=diarization_info,
             language=rec.language,
             duration_sec=rec.duration_sec or 0.0,
             processing_duration_sec=rec.processing_duration_sec or 0.0,
