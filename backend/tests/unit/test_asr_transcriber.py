@@ -57,7 +57,11 @@ def _reset_engine(monkeypatch: pytest.MonkeyPatch) -> Any:
     """每個測試前重置 engine，並注入最小 Settings 使後處理全數關閉。"""
     import app.core.config as _config_mod
 
-    _config_mod.get_settings.cache_clear()
+    # 必須在 monkeypatch 之前保留原始 get_settings 參考，
+    # 因為 monkeypatch.setattr 會將 _config_mod.get_settings 替換為 lambda，
+    # 之後直接呼叫 .cache_clear() 會 AttributeError（lambda 沒有 cache_clear）。
+    _original_get_settings = _config_mod.get_settings
+    _original_get_settings.cache_clear()
 
     from app.core.config import Settings
 
@@ -79,7 +83,7 @@ def _reset_engine(monkeypatch: pytest.MonkeyPatch) -> Any:
     AsrEngineManager.set_asr_for_test(None, model_version="unknown")
     yield
     AsrEngineManager.set_asr_for_test(None, model_version="unknown")
-    _config_mod.get_settings.cache_clear()
+    _original_get_settings.cache_clear()
 
 
 def _seed_audio(db: Session, api_key_id: int, duration_sec: float | None = 5.0) -> int:

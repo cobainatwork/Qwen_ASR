@@ -165,22 +165,22 @@ def test_initialize_raises_when_qwen_asr_missing(tmp_path: Path) -> None:
 
 
 def test_initialize_raises_on_invalid_dtype(tmp_path: Path) -> None:
-    """非法 FORCED_ALIGNER_DTYPE 應在進入 Qwen3ASRModel.LLM 之前就拋 RuntimeError。"""
-    import torch
+    """非法 FORCED_ALIGNER_DTYPE 由 pydantic Literal 在 Settings 構造階段直接攔截。
+
+    M4-revisit 將 FORCED_ALIGNER_DTYPE 改為 Literal["bfloat16","float16","float32"]
+    之後，AsrEngineManager.initialize 內的 `if dtype is None` 分支成為 defense-in-depth
+    死碼（never reached），驗證點上移至 Settings 構造階段。
+    """
+    from pydantic import ValidationError
 
     from app.core.config import Settings
 
-    settings = Settings(
-        API_KEY="test",
-        DATABASE_URL="postgresql+psycopg://u:p@h/d",
-        DB_PASSWORD="p",
-        THIRD_PARTY_LICENSE_ACK=True,
-        MODEL_CACHE_DIR=tmp_path,
-        FORCED_ALIGNER_DTYPE="float8",  # type: ignore[arg-type]  # 故意 invalid
-    )  # type: ignore[call-arg]
-
-    with patch("app.services.asr.engine.Qwen3ASRModel") as mock_model_cls, \
-         patch("app.services.asr.engine._get_dtype_map", return_value={"bfloat16": torch.bfloat16}):
-        mock_model_cls.LLM = MagicMock()
-        with pytest.raises(RuntimeError, match="FORCED_ALIGNER_DTYPE 不合法"):
-            AsrEngineManager.initialize(settings)
+    with pytest.raises(ValidationError, match="FORCED_ALIGNER_DTYPE"):
+        Settings(
+            API_KEY="test",
+            DATABASE_URL="postgresql+psycopg://u:p@h/d",
+            DB_PASSWORD="p",
+            THIRD_PARTY_LICENSE_ACK=True,
+            MODEL_CACHE_DIR=tmp_path,
+            FORCED_ALIGNER_DTYPE="float8",  # type: ignore[arg-type]  # 故意 invalid
+        )  # type: ignore[call-arg]
