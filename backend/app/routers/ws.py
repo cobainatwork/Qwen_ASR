@@ -34,6 +34,7 @@ from app.services.ws_quality import (
     HeartbeatWatchdog,
     WebSocketManager,
     authenticate_websocket,
+    get_streaming_limitations,
 )
 
 logger = structlog.get_logger(__name__)
@@ -136,16 +137,14 @@ async def quality_websocket(
                     )
                 )
             elif action == "stream.start":
-                # Phase 3 hook: T10.6 will replace with get_streaming_limitations()
+                limits = get_streaming_limitations()
                 await websocket.send_text(
                     json.dumps(
                         {
                             "action": "stream.unavailable",
                             "reason": "streaming endpoint reserved for Phase 3",
-                            "limitations": [
-                                "qwen-asr 0.0.6 streaming does not support timestamps",
-                                "qwen-asr 0.0.6 streaming does not support batch input",
-                            ],
+                            "limitations": limits["limitations"],
+                            "status": limits["status"],
                         }
                     )
                 )
