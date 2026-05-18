@@ -43,12 +43,29 @@ RUN python -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip wheel setuptools
 ENV PATH="/opt/venv/bin:$PATH"
 
-# 條件式安裝依賴：base → [audio]（M3 起）→ [gpu]（M4 起）
+# 條件式安裝依賴：base → [audio]（M3 起）→ [gpu]（M4 起）→ flash-attn prebuilt wheel
 # 使用正式安裝（非 editable）確保 site-packages 內含 app 套件，
 # 不依賴 /build 目錄，Stage 3 runtime 可正確 import。
+#
+# flash-attn 用 prebuilt wheel 而非 pip extras 安裝，原因：
+# 1. flash-attn setup.py 在 PEP 517 isolated build env 直接 import torch，但
+#    pip 隔離環境此時 torch 尚未裝，故走 source build 必失敗。
+# 2. base image python:3.12-slim-bookworm 無 nvcc / CUDA toolkit，即使先裝
+#    torch 仍編譯失敗。
+# 3. 走 prebuilt wheel 避開上述，且 ABI 三要素（cu12 / torch 2.9 / cp312 /
+#    cxx11abiTRUE）需與容器內 torch 精準匹配——目前 qwen-asr[vllm] 0.0.6
+#    透過 vllm==0.14.0 拉 torch 2.9.1+cu128，cxx11_abi=True，匹配下列 wheel。
+# 4. 升級 torch / cu 版本時必須同步更新此 URL 與 SHA256，否則 ABI 失配會在
+#    runtime 觸發 undefined symbol 或 segfault（無 Python 例外可 catch）。
+# 5. --no-deps 防止 pip resolver 在 wheel METADATA 的 Requires-Dist 觸發二次
+#    torch 解析（torch 已由 qwen-asr[vllm] 鎖定）。
 RUN pip install "." \
     && if [ "$INSTALL_AUDIO_DEPS" = "true" ]; then pip install ".[audio]"; fi \
-    && if [ "$INSTALL_GPU_DEPS" = "true" ]; then pip install ".[gpu]"; fi
+    && if [ "$INSTALL_GPU_DEPS" = "true" ]; then \
+         pip install ".[gpu]" \
+         && pip install --no-deps \
+            "https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3%2Bcu12torch2.9cxx11abiTRUE-cp312-cp312-linux_x86_64.whl#sha256=4e2f9e39313266b1544b68138b15b91ee6221eccf14f7902b7c6620351340810"; \
+       fi
 
 # ============================================================
 # Stage 3: runtime — 最終映像
