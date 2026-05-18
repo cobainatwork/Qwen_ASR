@@ -55,6 +55,11 @@ gpu = [
   # qwen-asr 官方套件（M4-revisit 改採），[vllm] extra 自帶 vllm==0.14.0
   # 不在此處直接約束 vllm 版本，讓 qwen-asr[vllm] 的 dependency resolver 決定
   "qwen-asr[vllm]>=0.0.6,<0.1",
+  # pyannote.audio：vendor profile 預設 DIARIZATION_BACKEND=pyannote 必需。
+  # 3.x 支援 torch 2.x；3.1 模型卡指定相容 pyannote.audio 3.x。需搭配 HF_TOKEN
+  # 與 huggingface.co 上的 model terms accept。client profile 通常停用 diarization
+  # 仍會被裝入 image，但本 extra 整段僅 INSTALL_GPU_DEPS=true 時觸發，影響有限。
+  "pyannote.audio>=3.3,<4",
   # flash-attn 不在此處列出。原因見 backend/Dockerfile 內 RUN pip install
   # ".[gpu]" 後的詳細註解：PEP 517 isolated build env 缺 torch + base image
   # 缺 nvcc，必須走 prebuilt wheel；ABI 三要素（cu12 / torch 2.9 / cp312 /
