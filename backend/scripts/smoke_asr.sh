@@ -16,10 +16,10 @@ if [ ! -f "$AUDIO_FILE" ]; then
 fi
 
 echo "smoke: POST $HOST/api/v1/asr/transcribe with $AUDIO_FILE"
+# qwen-asr 0.0.6 僅接英文官方語言名稱（Chinese / English / Cantonese ...），不接受 ISO 代碼。
 response=$(curl -fsS -X POST "$HOST/api/v1/asr/transcribe" \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@$AUDIO_FILE" \
-# qwen-asr 0.0.6 僅接英文官方語言名稱（Chinese / English / Cantonese ...），不接受 ISO 代碼。
   -F 'options_json={"language":"Chinese","return_timestamps":true}')
 
 echo "$response" | jq '{
