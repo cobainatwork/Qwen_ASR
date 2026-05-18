@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from app.core.exceptions import AppException
 from app.core.security import derive_hmac_key, hash_token, lookup_prefix
@@ -90,3 +92,62 @@ def test_invalid_token_returns_401(db_session: Session) -> None:
         "/protected", headers={"Authorization": "Bearer not-a-real-token"}
     )
     assert resp.status_code == 401
+
+
+def _seed_token_with_expires(
+    db_session: Session,
+    name: str,
+    raw_token: str,
+    expires_at: datetime,
+) -> None:
+    """插入一筆 api_key 並設定 expires_at（綁定參數，避免字串拼接）。"""
+    hmac_key = derive_hmac_key("bootstrap-test")
+    db_session.execute(
+        text(
+            "INSERT INTO api_keys (key_hash, lookup_prefix, name, scopes, expires_at) "
+            "VALUES (:h, :p, :n, '{asr:read,asr:write}', :e)"
+        ),
+        {
+            "h": hash_token(raw_token),
+            "p": lookup_prefix(raw_token, hmac_key),
+            "n": name,
+            "e": expires_at,
+        },
+    )
+    db_session.commit()
+
+
+def test_expired_token_returns_401(
+    db_session: Session, real_token_setup: tuple[str, int]
+) -> None:
+    """expires_at 已過 → 401（規格 §19.1 line 2740：已過期同回 401）。"""
+    expired_token = "expired-token-xyz"
+    _seed_token_with_expires(
+        db_session,
+        "expired-k",
+        expired_token,
+        datetime.now(UTC) - timedelta(days=1),
+    )
+    app = _app_with_override(db_session)
+    resp = TestClient(app).get(
+        "/protected", headers={"Authorization": f"Bearer {expired_token}"}
+    )
+    assert resp.status_code == 401, resp.text
+
+
+def test_future_expires_token_returns_200(
+    db_session: Session, real_token_setup: tuple[str, int]
+) -> None:
+    """expires_at 在未來 → 仍可認證。"""
+    future_token = "future-expires-token-abc"
+    _seed_token_with_expires(
+        db_session,
+        "future-k",
+        future_token,
+        datetime.now(UTC) + timedelta(days=1),
+    )
+    app = _app_with_override(db_session)
+    resp = TestClient(app).get(
+        "/protected", headers={"Authorization": f"Bearer {future_token}"}
+    )
+    assert resp.status_code == 200, resp.text
