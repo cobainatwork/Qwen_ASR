@@ -72,8 +72,28 @@ def load_pyannote(hf_token: str | None) -> Any:
 
 
 def run_pyannote(pipeline: Any, wav_path: str) -> list[tuple[str, float, float]]:
-    """執行 pyannote diarization，回傳 list[(speaker_id, start_sec, end_sec)]。"""
-    diarization = pipeline(wav_path)
+    """執行 pyannote diarization，回傳 list[(speaker_id, start_sec, end_sec)]。
+
+    繞過 ``torchaudio.load``：pyannote 3.4 ``Audio.__call__`` 內部硬呼叫
+    ``torchaudio.load(file["audio"])``，而 torchaudio 2.9+ 把 ``load()`` delegate
+    給 torchcodec。本專案因 slim-bookworm + ffmpeg 5.1 ABI 不相容刻意排除
+    torchcodec（詳見 ``project-gpu-smoke-pitfalls``），導致直接傳檔案路徑時
+    ``ModuleNotFoundError: No module named 'torchcodec'``。
+
+    解法：以 soundfile 預讀為 numpy → 轉 torch tensor → 以 ``{"waveform":
+    tensor, "sample_rate": sr}`` dict 形式傳入 pipeline，pyannote 的
+    ``Audio.__call__`` 走「waveform 已載入」分支，整段跳過 ``torchaudio.load``。
+
+    waveform shape 需為 ``(channels, samples)``；soundfile 回傳
+    ``(samples, channels)``，需轉置。
+    """
+    import soundfile as sf  # noqa: PLC0415
+    import torch  # noqa: PLC0415
+
+    data, sample_rate = sf.read(wav_path, dtype="float32", always_2d=True)
+    waveform = torch.from_numpy(data.T).contiguous()
+
+    diarization = pipeline({"waveform": waveform, "sample_rate": sample_rate})
     segments: list[tuple[str, float, float]] = []
     for turn, _, speaker in diarization.itertracks(yield_label=True):
         segments.append((str(speaker), float(turn.start), float(turn.end)))
