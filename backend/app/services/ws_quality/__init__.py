@@ -1,2 +1,3 @@
-# Phase 2 / M10 — populated in T10.2/T10.3
-# auth.py / heartbeat.py / manager.py are created in subsequent tasks.
+from app.services.ws_quality.auth import authenticate_websocket
+
+__all__ = ["authenticate_websocket"]
