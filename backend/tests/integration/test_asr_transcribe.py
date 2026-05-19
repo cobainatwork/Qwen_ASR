@@ -269,3 +269,111 @@ def test_transcribe_unauthenticated_returns_401(
                 data={"options_json": "{}"},
             )
     assert resp.status_code == 401, resp.text
+
+
+# ── /transcribe-stored/{audio_file_id} ──────────────────────────────────
+
+
+@pytest.mark.timeout(60)
+def test_transcribe_stored_returns_text(app_with_asr: tuple[FastAPI, str]) -> None:
+    """既存 audio_file → /transcribe-stored/{id} 回 200 + 固定 text。
+
+    流程：先用 /transcribe 上傳取得 audio_file_id，再用 /transcribe-stored
+    對同一個 audio 重跑 ASR（模擬 YouTube 下載完成後一鍵辨識）。
+    """
+    app, token = app_with_asr
+    with TestClient(app) as client:
+        with (FIXTURES / "valid_16k_mono.wav").open("rb") as f:
+            upload = client.post(
+                "/api/v1/asr/transcribe",
+                files={"file": ("a.wav", f, "audio/wav")},
+                data={"options_json": "{}"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        assert upload.status_code == 200, upload.text
+        audio_file_id = upload.json()["data"]["audio_file_id"]
+
+        resp = client.post(
+            f"/api/v1/asr/transcribe-stored/{audio_file_id}",
+            data={"options_json": json.dumps({"language": "Chinese"})},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"]["text"] == "你好世界，這是測試辨識結果。"
+    assert body["data"]["audio_file_id"] == audio_file_id
+    assert body["data"]["model_version"] == "MOCK@TEST"
+
+
+@pytest.mark.timeout(60)
+def test_transcribe_stored_not_found(app_with_asr: tuple[FastAPI, str]) -> None:
+    """不存在的 audio_file_id → 404 RESOURCE_NOT_FOUND。"""
+    app, token = app_with_asr
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/asr/transcribe-stored/99999",
+            data={"options_json": "{}"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    assert resp.status_code == 404, resp.text
+
+
+@pytest.mark.timeout(60)
+def test_transcribe_stored_cross_tenant_blocked(
+    app_with_asr: tuple[FastAPI, str], db_session: Session
+) -> None:
+    """跨租戶 audio_file 必須回 404（不洩漏存在性，不可回 403）。"""
+    other_token = "other-tenant-token"
+    other_hmac = derive_hmac_key("smoke-bootstrap")
+    db_session.execute(
+        text(
+            "INSERT INTO api_keys (key_hash, lookup_prefix, name, scopes) "
+            "VALUES (:h, :p, 'other', '{asr:write}') RETURNING id"
+        ),
+        {
+            "h": hash_token(other_token),
+            "p": lookup_prefix(other_token, other_hmac),
+        },
+    )
+    other_key_id = db_session.execute(
+        text("SELECT id FROM api_keys WHERE name = 'other'")
+    ).scalar_one()
+    db_session.execute(
+        text(
+            "INSERT INTO audio_files "
+            "(api_key_id, original_name, storage_path, file_size) "
+            "VALUES (:k, 'other.wav', '/tmp/nonexistent.wav', 100) RETURNING id"
+        ),
+        {"k": other_key_id},
+    )
+    foreign_audio_id = db_session.execute(
+        text(
+            "SELECT id FROM audio_files WHERE api_key_id = :k ORDER BY id DESC"
+        ),
+        {"k": other_key_id},
+    ).scalar_one()
+    db_session.commit()
+
+    app, my_token = app_with_asr
+    with TestClient(app) as client:
+        resp = client.post(
+            f"/api/v1/asr/transcribe-stored/{foreign_audio_id}",
+            data={"options_json": "{}"},
+            headers={"Authorization": f"Bearer {my_token}"},
+        )
+    assert resp.status_code == 404, resp.text
+
+
+@pytest.mark.timeout(60)
+def test_transcribe_stored_unauthenticated_returns_401(
+    app_with_asr: tuple[FastAPI, str],
+) -> None:
+    """無 Authorization header → 401。"""
+    app, _ = app_with_asr
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/asr/transcribe-stored/1",
+            data={"options_json": "{}"},
+        )
+    assert resp.status_code == 401, resp.text

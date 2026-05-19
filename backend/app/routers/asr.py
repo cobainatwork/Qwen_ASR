@@ -8,11 +8,15 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.core.exceptions import AudioFileTooLargeError, ValidationFailedError
+from app.core.exceptions import (
+    AudioFileTooLargeError,
+    NotFoundError,
+    ValidationFailedError,
+)
 from app.core.response import success
 from app.deps.auth import require_scope
 from app.deps.db import get_db
-from app.models import ApiKey
+from app.models import ApiKey, AudioFile
 from app.repositories.audio_file import AudioFileRepository
 from app.schemas.asr import (
     DiarizationInfo,
@@ -85,6 +89,33 @@ async def transcribe(
     )
     db.commit()
 
+    return success(
+        await _run_asr_pipeline(
+            audio=audio,
+            options=options,
+            warnings=warnings,
+            db=db,
+            queue=queue,
+            settings=settings,
+            api_key=api_key,
+        )
+    )
+
+
+async def _run_asr_pipeline(
+    *,
+    audio: AudioFile,
+    options: TranscribeOptions,
+    warnings: list[str],
+    db: Session,
+    queue: QueueBackend,
+    settings: Settings,
+    api_key: ApiKey,
+) -> TranscribeData:
+    """共用 ASR pipeline：resample → VAD → enqueue → wait_for_job → 投影 TranscribeData。
+
+    被 /transcribe（剛 store 的 audio）與 /transcribe-stored/{id}（既存 audio）共用。
+    """
     resample = await resample_to_16k_mono(
         Path(audio.storage_path),
         settings.AUDIO_STORAGE_DIR / "processed",
@@ -135,20 +166,62 @@ async def transcribe(
         if isinstance(diarization_meta, dict)
         else None
     )
+    return TranscribeData(
+        transcription_id=rec.id,
+        audio_file_id=audio.id,
+        text=rec.transcript_text or "",
+        timestamps=timestamps,
+        speakers=speakers,
+        diarization=diarization_info,
+        language=rec.language,
+        duration_sec=rec.duration_sec or 0.0,
+        processing_duration_sec=rec.processing_duration_sec or 0.0,
+        model_version=rec.model_version,
+        resampling_warning=resample.resampling_warning,
+        vad_segments_count=len(vad_segments),
+        warnings=warnings,
+    )
+
+
+@router.post(
+    "/transcribe-stored/{audio_file_id}",
+    response_model=ResponseEnvelope[TranscribeData],
+)
+async def transcribe_stored(
+    audio_file_id: int,
+    request: Request,
+    options_json: str = Form("{}"),
+    api_key: ApiKey = Depends(require_scope("asr:write")),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ResponseEnvelope[TranscribeData]:
+    """對已存在的 audio_file 重跑 ASR pipeline（不需 re-upload）。
+
+    使用情境：YouTube 下載完成、或歷史音檔重新辨識。Tenant 隔離由
+    AudioFileRepository.get 自動處理（不屬於當前 api_key 的 audio_file_id
+    會回 None → 404）。
+    """
+    queue = get_queue(request)
+
+    try:
+        options = TranscribeOptions.model_validate_json(options_json)
+    except Exception as e:
+        raise ValidationFailedError(details={"options_json": str(e)}) from e
+
+    warnings = collect_unsupported_warnings(options)
+
+    audio = AudioFileRepository(db, api_key.id).get(audio_file_id)
+    if audio is None:
+        raise NotFoundError(message="音檔不存在或無權限存取")
+
     return success(
-        TranscribeData(
-            transcription_id=rec.id,
-            audio_file_id=audio.id,
-            text=rec.transcript_text or "",
-            timestamps=timestamps,
-            speakers=speakers,
-            diarization=diarization_info,
-            language=rec.language,
-            duration_sec=rec.duration_sec or 0.0,
-            processing_duration_sec=rec.processing_duration_sec or 0.0,
-            model_version=rec.model_version,
-            resampling_warning=resample.resampling_warning,
-            vad_segments_count=len(vad_segments),
+        await _run_asr_pipeline(
+            audio=audio,
+            options=options,
             warnings=warnings,
+            db=db,
+            queue=queue,
+            settings=settings,
+            api_key=api_key,
         )
     )
