@@ -55,4 +55,42 @@ describe('AudioUploader', () => {
     await waitFor(() => expect(onResult).toHaveBeenCalled());
     expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ text: '測試文字' }));
   });
+
+  it('selecting Chinese sends language: "Chinese" in options_json', async () => {
+    localStorage.setItem('qwen-asr-token', 'test-token');
+    const onResult = jest.fn();
+    render(<AuthProvider><AudioUploader onResult={onResult} /></AuthProvider>);
+
+    const file = new File(['fake'], 'a.wav', { type: 'audio/wav' });
+    await userEvent.upload(screen.getByLabelText('選擇音檔') as HTMLInputElement, file);
+    await userEvent.selectOptions(screen.getByLabelText('選擇辨識語言'), 'Chinese');
+    await userEvent.click(screen.getByRole('button', { name: '開始辨識' }));
+
+    await waitFor(() => expect(onResult).toHaveBeenCalled());
+
+    const fetchMock = global.fetch as jest.Mock;
+    const callArgs = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+    const formData = callArgs[1].body as FormData;
+    const optionsJson = formData.get('options_json') as string;
+    expect(JSON.parse(optionsJson)).toEqual({ language: 'Chinese' });
+  });
+
+  it('default auto omits language from options_json', async () => {
+    localStorage.setItem('qwen-asr-token', 'test-token');
+    const onResult = jest.fn();
+    render(<AuthProvider><AudioUploader onResult={onResult} /></AuthProvider>);
+
+    const file = new File(['fake'], 'a.wav', { type: 'audio/wav' });
+    await userEvent.upload(screen.getByLabelText('選擇音檔') as HTMLInputElement, file);
+    // 不選 language，保留預設「自動偵測」
+    await userEvent.click(screen.getByRole('button', { name: '開始辨識' }));
+
+    await waitFor(() => expect(onResult).toHaveBeenCalled());
+
+    const fetchMock = global.fetch as jest.Mock;
+    const callArgs = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+    const formData = callArgs[1].body as FormData;
+    const parsed = JSON.parse(formData.get('options_json') as string);
+    expect(parsed.language).toBeUndefined();
+  });
 });
