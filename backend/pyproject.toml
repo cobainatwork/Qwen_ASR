@@ -55,6 +55,13 @@ audio = [
   # 取得後掛入 VAD_MODEL_DIR；container 內缺檔時 development 容忍降級。
   "fireredvad>=0.0.2,<0.1",
 ]
+youtube = [
+  # M9 YouTube 下載端點（vendor profile only）。app/services/youtube/downloader.py
+  # 透過 yt_dlp 取得 metadata + 下載音檔。Bookworm-slim runtime 容器
+  # INSTALL_YOUTUBE_DEPS=true 才安裝；client profile 容器不需要（router 不掛載）。
+  # 版本下限：2024.7.0 — yt-dlp 每月對 YouTube API 變動發版，舊版常導致 throttling / 401。
+  "yt-dlp>=2024.7.0",
+]
 gpu = [
   # qwen-asr 官方套件（M4-revisit 改採），[vllm] extra 自帶 vllm==0.14.0
   # 不在此處直接約束 vllm 版本，讓 qwen-asr[vllm] 的 dependency resolver 決定
