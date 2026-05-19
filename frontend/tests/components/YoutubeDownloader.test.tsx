@@ -159,4 +159,73 @@ describe('YoutubeDownloader', () => {
       expect.objectContaining({ text: '辨識成功' }),
     );
   });
+
+  it('passes selected language to transcribe-stored', async () => {
+    localStorage.setItem('qwen-asr-token', 'test-token');
+    const transcribeBodies: string[] = [];
+    const mockFetch = jest.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (typeof url === 'string' && url.endsWith('/transcribe-stored/100')) {
+        const body = init?.body as FormData;
+        transcribeBodies.push(body.get('options_json') as string);
+        return Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: {
+                transcription_id: 1,
+                audio_file_id: 100,
+                text: 'X',
+                duration_sec: 1,
+                processing_duration_sec: 1,
+                model_version: 'M',
+                resampling_warning: false,
+                vad_segments_count: 0,
+                warnings: [],
+              },
+              error: null,
+            }),
+        });
+      }
+      if (typeof url === 'string' && url.includes('/downloads')) {
+        return Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: [
+                {
+                  id: 1,
+                  url: 'u',
+                  video_title: 'T',
+                  audio_file_id: 100,
+                  status: 'completed',
+                  error_message: null,
+                  file_size: 1,
+                  duration_sec: 1,
+                  created_at: '2026-01-01T00:00:00Z',
+                  updated_at: '2026-01-01T00:00:00Z',
+                },
+              ],
+              error: null,
+            }),
+        });
+      }
+      return Promise.reject(new Error(`unexpected ${url}`));
+    });
+    global.fetch = mockFetch as unknown as typeof fetch;
+
+    render(
+      <AuthProvider>
+        <YoutubeDownloader onTranscribed={() => {}} />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('T')).toBeInTheDocument());
+    await userEvent.selectOptions(
+      screen.getByLabelText('YouTube 辨識語言'),
+      'Chinese',
+    );
+    await userEvent.click(screen.getByRole('button', { name: '辨識' }));
+
+    await waitFor(() => expect(transcribeBodies).toHaveLength(1));
+    expect(JSON.parse(transcribeBodies[0])).toEqual({ language: 'Chinese' });
+  });
 });

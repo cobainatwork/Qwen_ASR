@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuth } from '@/components/auth/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { ApiClient, ApiError } from '@/lib/api/client';
+import { LANGUAGE_OPTIONS } from '@/lib/api/languages';
 import type { TranscribeData, YoutubeDownloadData } from '@/lib/api/types';
 
 const POLL_INTERVAL_MS = 3000;
@@ -20,10 +21,12 @@ const isActiveStatus = (s: string) => s === 'pending' || s === 'downloading';
 export function YoutubeDownloader({ onTranscribed }: Props) {
   const { token } = useAuth();
   const [url, setUrl] = useState('');
+  const [language, setLanguage] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [transcribingId, setTranscribingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloads, setDownloads] = useState<YoutubeDownloadData[]>([]);
+  const downloadsRef = useRef<YoutubeDownloadData[]>([]);
 
   const client = useMemo(
     () => (token ? new ApiClient({ getToken: () => token }) : null),
@@ -35,6 +38,7 @@ export function YoutubeDownloader({ onTranscribed }: Props) {
     try {
       const list = await client.listYoutubeDownloads({ limit: 20 });
       setDownloads(list);
+      downloadsRef.current = list;
     } catch (err) {
       // 靜默失敗（poll 不打擾使用者），僅在 console 留痕
       if (err instanceof ApiError) {
@@ -48,10 +52,9 @@ export function YoutubeDownloader({ onTranscribed }: Props) {
     if (!token) return;
     refresh();
     const id = setInterval(() => {
-      setDownloads((prev) => {
-        if (prev.some((d) => isActiveStatus(d.status))) refresh();
-        return prev;
-      });
+      if (downloadsRef.current.some((d) => isActiveStatus(d.status))) {
+        refresh();
+      }
     }, POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [token, refresh]);
@@ -80,7 +83,9 @@ export function YoutubeDownloader({ onTranscribed }: Props) {
     setTranscribingId(audioFileId);
     setError(null);
     try {
-      const data = await client.transcribeStored(audioFileId);
+      const data = await client.transcribeStored(audioFileId, {
+        language: language || undefined,
+      });
       onTranscribed(data);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -116,6 +121,21 @@ export function YoutubeDownloader({ onTranscribed }: Props) {
           {submitting ? '送出中...' : '下載'}
         </Button>
       </div>
+      <label className="block mb-4">
+        <span className="text-sm font-medium mr-2">辨識語言：</span>
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+          className="border rounded px-2 py-1 bg-white/70"
+          aria-label="YouTube 辨識語言"
+        >
+          {LANGUAGE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </label>
       {error && <p className="mb-4 text-red-500 text-sm">{error}</p>}
 
       {downloads.length === 0 ? (
@@ -138,7 +158,9 @@ export function YoutubeDownloader({ onTranscribed }: Props) {
                 )}
               </div>
               <Button
-                onClick={() => d.audio_file_id && transcribe(d.audio_file_id)}
+                onClick={() =>
+                  d.audio_file_id !== null && transcribe(d.audio_file_id)
+                }
                 disabled={
                   d.status !== 'completed' ||
                   d.audio_file_id === null ||
