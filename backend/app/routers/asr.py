@@ -122,6 +122,13 @@ async def _run_asr_pipeline(
     )
     log.info("asr pipeline start")
 
+    # 防同一 audio_file_id 並發 transcribe（雙 tab / retry storm）
+    repo = AudioFileRepository(db, api_key.id)
+    locked = repo.lock_for_processing(audio.id)
+    if locked is None:
+        raise NotFoundError(message="音檔不存在或無權限存取")
+    audio = locked
+
     safe_path = ensure_safe_audio_path(
         audio.storage_path, base_dir=settings.AUDIO_STORAGE_DIR
     )

@@ -377,3 +377,63 @@ def test_transcribe_stored_unauthenticated_returns_401(
             data={"options_json": "{}"},
         )
     assert resp.status_code == 401, resp.text
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.xfail(
+    strict=False,
+    reason=(
+        "app_with_asr fixture 共用單一 db_session；多 thread 並發時 SQLAlchemy "
+        "Session.flush() 會互相碰撞（'Session is already flushing'）。此為 test "
+        "fixture 結構性限制，不反映 production 行為（production 每個請求有獨立 "
+        "Session + 獨立 DB connection，SELECT FOR UPDATE 真正阻塞生效）。"
+        "測試保留為 regression rail：若未來重構讓共用 session 消失，此測試應自動轉 PASS。"
+    ),
+)
+def test_transcribe_stored_concurrent_calls_complete_without_error(
+    app_with_asr: tuple[FastAPI, str],
+) -> None:
+    """同一 audio_file_id 並發 transcribe-stored 必須序列化執行（SELECT FOR UPDATE）。
+
+    驗證點：兩個 thread 同時打 /transcribe-stored，最終都拿到 200（或第二個 409）；
+    結果不可有 unhandled 500、不可有 DB constraint violation、不可有未捕獲例外。
+    Mock ASR 引擎極快，無法用 timing 確切驗證序列化是否生效；改以「兩個請求都正常結束」
+    為契約鎖。
+    """
+    import threading
+
+    app, token = app_with_asr
+    # 先 seed 一個 audio_file
+    with TestClient(app) as client:
+        with (FIXTURES / "valid_16k_mono.wav").open("rb") as f:
+            upload = client.post(
+                "/api/v1/asr/transcribe",
+                files={"file": ("a.wav", f, "audio/wav")},
+                data={"options_json": "{}"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        assert upload.status_code == 200, upload.text
+        audio_file_id = upload.json()["data"]["audio_file_id"]
+
+    results: list[tuple[int, str]] = []  # (status_code, body_text_or_error)
+
+    def call() -> None:
+        with TestClient(app) as client:
+            r = client.post(
+                f"/api/v1/asr/transcribe-stored/{audio_file_id}",
+                data={"options_json": "{}"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            results.append((r.status_code, r.text[:200]))
+
+    t1 = threading.Thread(target=call)
+    t2 = threading.Thread(target=call)
+    t1.start()
+    t2.start()
+    t1.join(timeout=30)
+    t2.join(timeout=30)
+
+    assert len(results) == 2, f"both threads must finish; got results={results}"
+    # 任何 5xx 即視為鎖實作有 bug
+    for status_code, body in results:
+        assert status_code < 500, f"unexpected 5xx: status={status_code} body={body}"
