@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { ApiClient, ApiError } from '@/lib/api/client';
+import { LANGUAGE_OPTIONS } from '@/lib/api/languages';
 import type { TranscribeData } from '@/lib/api/types';
 import { useAuth } from '@/components/auth/useAuth';
 import { Button } from '@/components/ui/Button';
@@ -11,17 +12,6 @@ import { Card } from '@/components/ui/Card';
 interface Props {
   onResult: (data: TranscribeData) => void;
 }
-
-// qwen-asr 0.0.6 只接受英文官方語言名稱或 null（自動偵測）。
-// 此清單為前端常用語言，並非完整支援列表。
-const LANGUAGE_OPTIONS = [
-  { value: '', label: '自動偵測' },
-  { value: 'Chinese', label: '中文（國語 / 普通話）' },
-  { value: 'Cantonese', label: '粵語' },
-  { value: 'English', label: 'English' },
-  { value: 'Japanese', label: '日本語' },
-  { value: 'Korean', label: '한국어' },
-] as const;
 
 export function AudioUploader({ onResult }: Props) {
   const { token } = useAuth();
