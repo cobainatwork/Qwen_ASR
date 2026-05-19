@@ -6,6 +6,7 @@ export function Header() {
       <Link href="/" className="text-xl font-semibold">Qwen3-ASR</Link>
       <nav className="flex gap-4 text-sm">
         <Link href="/" className="hover:text-accent">辨識</Link>
+        <Link href="/youtube" className="hover:text-accent">YouTube</Link>
         <Link href="/history" className="hover:text-accent">歷史</Link>
         <Link href="/keys" className="hover:text-accent">金鑰</Link>
       </nav>
