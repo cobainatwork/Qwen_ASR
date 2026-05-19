@@ -140,7 +140,7 @@ async def _run_asr_pipeline(
         audio_file_id=audio.id,
         api_key_id=api_key.id,
         options=options.model_dump(),
-        future=asyncio.get_event_loop().create_future(),
+        future=asyncio.get_running_loop().create_future(),
     )
     await queue.enqueue(job, QueuePriority.BATCH)
     transcription_id = await wait_for_job(job, timeout=settings.ASR_REQUEST_TIMEOUT_SEC)
