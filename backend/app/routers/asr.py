@@ -12,6 +12,7 @@ from app.core.exceptions import (
     NotFoundError,
     ValidationFailedError,
 )
+from app.core.idempotency import get_idempotency_cache, idempotent
 from app.core.response import success
 from app.deps.auth import require_scope
 from app.deps.db import get_db
@@ -56,10 +57,16 @@ async def transcribe(
     file: UploadFile = File(...),
     options_json: str = Form("{}"),
     api_key: ApiKey = Depends(require_scope("asr:write")),
+    _idem: None = Depends(idempotent),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> ResponseEnvelope[TranscribeData]:
     queue = get_queue(request)
+
+    # Idempotency-Key cache hit: return cached response without re-running pipeline.
+    cached = getattr(request.state, "idempotency_cached", None)
+    if cached is not None:
+        return success(TranscribeData(**cached))
 
     # 解析 options
     try:
@@ -89,17 +96,19 @@ async def transcribe(
     )
     db.commit()
 
-    return success(
-        await _run_asr_pipeline(
-            audio=audio,
-            options=options,
-            warnings=warnings,
-            db=db,
-            queue=queue,
-            settings=settings,
-            api_key=api_key,
-        )
+    result = await _run_asr_pipeline(
+        audio=audio,
+        options=options,
+        warnings=warnings,
+        db=db,
+        queue=queue,
+        settings=settings,
+        api_key=api_key,
     )
+    idem_key = getattr(request.state, "idempotency_key", None)
+    if idem_key is not None:
+        get_idempotency_cache().record(idem_key, result.model_dump(mode="json"))
+    return success(result)
 
 
 async def _run_asr_pipeline(
@@ -215,6 +224,7 @@ async def transcribe_stored(
     request: Request,
     options_json: str = Form("{}"),
     api_key: ApiKey = Depends(require_scope("asr:write")),
+    _idem: None = Depends(idempotent),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> ResponseEnvelope[TranscribeData]:
@@ -225,6 +235,11 @@ async def transcribe_stored(
     會回 None → 404）。
     """
     queue = get_queue(request)
+
+    # Idempotency-Key cache hit: return cached response without re-running pipeline.
+    cached = getattr(request.state, "idempotency_cached", None)
+    if cached is not None:
+        return success(TranscribeData(**cached))
 
     try:
         options = TranscribeOptions.model_validate_json(options_json)
@@ -237,14 +252,16 @@ async def transcribe_stored(
     if audio is None:
         raise NotFoundError(message="音檔不存在或無權限存取")
 
-    return success(
-        await _run_asr_pipeline(
-            audio=audio,
-            options=options,
-            warnings=warnings,
-            db=db,
-            queue=queue,
-            settings=settings,
-            api_key=api_key,
-        )
+    result = await _run_asr_pipeline(
+        audio=audio,
+        options=options,
+        warnings=warnings,
+        db=db,
+        queue=queue,
+        settings=settings,
+        api_key=api_key,
     )
+    idem_key = getattr(request.state, "idempotency_key", None)
+    if idem_key is not None:
+        get_idempotency_cache().record(idem_key, result.model_dump(mode="json"))
+    return success(result)

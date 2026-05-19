@@ -380,6 +380,50 @@ def test_transcribe_stored_unauthenticated_returns_401(
 
 
 @pytest.mark.timeout(60)
+def test_transcribe_stored_replay_with_same_idempotency_key_returns_cached(
+    app_with_asr: tuple[FastAPI, str],
+) -> None:
+    """同一 Idempotency-Key + 同一 api_key 必須回 cache，不再進 ASR pipeline。"""
+    from app.core.idempotency import reset_for_test as reset_idem_cache
+
+    reset_idem_cache()
+    app, token = app_with_asr
+    with TestClient(app) as client:
+        with (FIXTURES / "valid_16k_mono.wav").open("rb") as f:
+            upload = client.post(
+                "/api/v1/asr/transcribe",
+                files={"file": ("a.wav", f, "audio/wav")},
+                data={"options_json": "{}"},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        assert upload.status_code == 200, upload.text
+        audio_file_id = upload.json()["data"]["audio_file_id"]
+
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Idempotency-Key": "replay-stored-xyz",
+        }
+        first = client.post(
+            f"/api/v1/asr/transcribe-stored/{audio_file_id}",
+            data={"options_json": "{}"},
+            headers=headers,
+        )
+        assert first.status_code == 200, first.text
+        replay = client.post(
+            f"/api/v1/asr/transcribe-stored/{audio_file_id}",
+            data={"options_json": "{}"},
+            headers=headers,
+        )
+        assert replay.status_code == 200, replay.text
+        assert (
+            first.json()["data"]["transcription_id"]
+            == replay.json()["data"]["transcription_id"]
+        ), "same Idempotency-Key must return same transcription_id"
+
+    reset_idem_cache()
+
+
+@pytest.mark.timeout(60)
 @pytest.mark.xfail(
     strict=False,
     reason=(

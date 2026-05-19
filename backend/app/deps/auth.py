@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -43,8 +43,14 @@ def get_current_tenant(
 
 
 def require_scope(scope: str) -> Callable[..., ApiKey]:
-    def _check(api_key: ApiKey = Depends(get_current_tenant)) -> ApiKey:
+    def _check(
+        request: Request,
+        api_key: ApiKey = Depends(get_current_tenant),
+    ) -> ApiKey:
         if "admin" in api_key.scopes or scope in api_key.scopes:
+            # Stash api_key on request.state so the idempotent dependency can
+            # read it without re-resolving from the database.
+            request.state.api_key = api_key
             return api_key
         raise ForbiddenError(
             code="AUTH_INSUFFICIENT_SCOPE",

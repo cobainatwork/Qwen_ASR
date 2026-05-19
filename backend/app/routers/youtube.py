@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings, get_settings
 from app.core.exceptions import NotFoundError
+from app.core.idempotency import get_idempotency_cache, idempotent
 from app.core.response import success
 from app.deps.auth import require_scope
 from app.deps.db import get_db, get_session_factory
@@ -95,12 +96,19 @@ async def _execute_download(
     status_code=status.HTTP_201_CREATED,
 )
 async def download(
+    request: Request,
     payload: YoutubeDownloadRequest,
     background: BackgroundTasks,
     api_key: ApiKey = Depends(require_scope("asr:write")),
+    _idem: None = Depends(idempotent),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> ResponseEnvelope[YoutubeDownloadData]:
+    # Idempotency-Key cache hit: return cached response without creating a new download.
+    cached = getattr(request.state, "idempotency_cached", None)
+    if cached is not None:
+        return success(YoutubeDownloadData(**cached))
+
     url = validate_youtube_url(payload.url, settings)
     repo = YoutubeDownloadRepository(db, api_key.id)
     record = repo.create(url=url, status="pending")
@@ -115,7 +123,11 @@ async def download(
         settings,
     )
 
-    return success(_to_data(record))
+    response_data = _to_data(record)
+    idem_key = getattr(request.state, "idempotency_key", None)
+    if idem_key is not None:
+        get_idempotency_cache().record(idem_key, response_data.model_dump(mode="json"))
+    return success(response_data)
 
 
 @router.get("/downloads", response_model=ResponseEnvelope[list[YoutubeDownloadData]])
