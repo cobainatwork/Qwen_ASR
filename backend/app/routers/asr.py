@@ -116,6 +116,12 @@ async def _run_asr_pipeline(
 
     被 /transcribe（剛 store 的 audio）與 /transcribe-stored/{id}（既存 audio）共用。
     """
+    log = logger.bind(
+        api_key_id=api_key.id,
+        audio_file_id=audio.id,
+    )
+    log.info("asr pipeline start")
+
     safe_path = ensure_safe_audio_path(
         audio.storage_path, base_dir=settings.AUDIO_STORAGE_DIR
     )
@@ -145,7 +151,7 @@ async def _run_asr_pipeline(
     await queue.enqueue(job, QueuePriority.BATCH)
     transcription_id = await wait_for_job(job, timeout=settings.ASR_REQUEST_TIMEOUT_SEC)
 
-    # 讀取結果
+    # 讀取結果（deferred import：避開 transcription → service → repository 循環）
     from app.repositories.transcription import TranscriptionRepository
 
     rec = TranscriptionRepository(db, api_key.id).get(transcription_id)
@@ -168,6 +174,13 @@ async def _run_asr_pipeline(
         )
         if isinstance(diarization_meta, dict)
         else None
+    )
+    log.info(
+        "asr pipeline complete",
+        transcription_id=rec.id,
+        duration_sec=rec.duration_sec or 0.0,
+        processing_duration_sec=rec.processing_duration_sec or 0.0,
+        model_version=rec.model_version,
     )
     return TranscribeData(
         transcription_id=rec.id,
