@@ -15,13 +15,30 @@
 }
 
 html, body {
+  height: 100vh;
+  overflow: hidden;
   background-color: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 @layer components {
+  .app-layout {
+    @apply flex flex-col h-screen overflow-hidden;
+  }
+  .app-header {
+    @apply h-12 flex-shrink-0 flex items-center px-4 border-b border-white/40 bg-glass-50 backdrop-blur-md;
+  }
+  .app-body {
+    @apply flex flex-1 overflow-hidden;
+  }
+  .app-sidebar {
+    @apply w-60 flex-shrink-0 border-r border-white/40 overflow-y-auto bg-glass-50 backdrop-blur-md;
+  }
+  .app-main {
+    @apply flex-1 overflow-hidden;
+  }
+
   .glass-card {
     @apply bg-glass-50 backdrop-blur-md rounded-2xl shadow-glass border border-white/30;
   }
@@ -31,4 +48,20 @@ html, body {
   .btn-secondary {
     @apply bg-glass-100 backdrop-blur-sm text-foreground px-4 py-2 rounded-xl border border-white/40 hover:bg-glass-50 transition-colors;
   }
+}
+
+/* 自訂捲軸（spec §4.3 light-theme 翻譯） */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.32);
 }
