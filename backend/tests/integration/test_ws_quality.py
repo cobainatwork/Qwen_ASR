@@ -186,3 +186,46 @@ def test_ws_insufficient_scope_rejected(
         asyncio.run(WebSocketManager.reset_for_test())
         db_session.execute(text("DELETE FROM api_keys WHERE name = 'wsread'"))
         db_session.commit()
+
+
+def test_ws_admin_scope_accepts_connection(
+    db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """admin scope 為 wildcard，與 deps/auth.py require_scope 同邏輯：admin 滿足任何 scope 需求。"""
+    monkeypatch.setenv("API_KEY", "ws-admin-test")
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://u:p@h/d")
+    monkeypatch.setenv("DB_PASSWORD", "p")
+    monkeypatch.setenv("THIRD_PARTY_LICENSE_ACK", "true")
+    monkeypatch.setenv("WS_MAX_CONNECTIONS_PER_KEY", "2")
+    monkeypatch.setenv("WS_HEARTBEAT_TIMEOUT_SEC", "3")
+    from app.core.config import get_settings
+    get_settings.cache_clear()
+
+    raw_token = "ws-admin-token"
+    hmac_key = derive_hmac_key("ws-admin-test")
+    db_session.execute(text("DELETE FROM api_keys WHERE name = 'wsadm'"))
+    db_session.execute(
+        text(
+            "INSERT INTO api_keys (key_hash, lookup_prefix, name, scopes) "
+            "VALUES (:h, :p, 'wsadm', '{admin}')"
+        ),
+        {"h": hash_token(raw_token), "p": lookup_prefix(raw_token, hmac_key)},
+    )
+    db_session.commit()
+    try:
+        from app.routers.ws import router as ws_router
+        app = FastAPI()
+        register_exception_handlers(app)
+        app.include_router(ws_router)
+        app.dependency_overrides[get_db] = lambda: db_session
+
+        sub = ["asr.v1", f"bearer.{_b64url(raw_token)}"]
+        with TestClient(app) as client:
+            with client.websocket_connect("/ws/quality", subprotocols=sub) as ws:
+                connected = json.loads(ws.receive_text())
+                assert connected["action"] == "connected"
+                assert "connection_id" in connected
+    finally:
+        asyncio.run(WebSocketManager.reset_for_test())
+        db_session.execute(text("DELETE FROM api_keys WHERE name = 'wsadm'"))
+        db_session.commit()

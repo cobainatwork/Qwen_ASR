@@ -57,9 +57,9 @@ async def quality_websocket(
         await websocket.close(code=1008, reason=e.code)
         return
 
-    # Scope 檢查（規格 §3.3.7 + §19.1.1）
+    # Scope 檢查（規格 §3.3.7 + §19.1.1）。admin 為 wildcard，與 deps/auth.py require_scope 同邏輯。
     scopes: list[str] = list(api_key.scopes) if api_key.scopes else []
-    if "asr:write" not in scopes:
+    if "admin" not in scopes and "asr:write" not in scopes:
         logger.warning(
             "ws scope check failed",
             api_key_id=api_key.id,
