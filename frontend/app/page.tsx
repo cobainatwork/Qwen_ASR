@@ -10,9 +10,11 @@ export default function Page() {
   const [result, setResult] = useState<TranscribeData | null>(null);
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <AudioUploader onResult={setResult} />
-      {result && <TranscriptionResult data={result} />}
+    <div className="h-full overflow-y-auto px-6 py-6">
+      <div className="max-w-2xl mx-auto">
+        <AudioUploader onResult={setResult} />
+        {result && <TranscriptionResult data={result} />}
+      </div>
     </div>
   );
 }

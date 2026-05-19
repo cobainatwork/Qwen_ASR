@@ -124,27 +124,28 @@ export default function CorrectionWorkbenchPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <p className="text-foreground/60">載入校正工作台中…</p>
-      </main>
+      </div>
     );
   }
 
   if (loadError) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
+      <div className="h-full flex items-center justify-center px-6">
         <Card className="max-w-md w-full">
           <p className="text-red-500 text-sm">{loadError}</p>
           <Button onClick={reload} className="mt-4">
             重新載入
           </Button>
         </Card>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen p-6 max-w-4xl mx-auto space-y-6">
+    <div className="h-full overflow-y-auto px-6 py-6">
+      <div className="max-w-4xl mx-auto space-y-6">
       {/* 工作階段標頭 */}
       <Card>
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -237,6 +238,7 @@ export default function CorrectionWorkbenchPage() {
           </p>
         )}
       </Card>
-    </main>
+      </div>
+    </div>
   );
 }
