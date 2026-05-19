@@ -32,6 +32,7 @@ FROM deps AS builder
 
 ARG INSTALL_GPU_DEPS=false
 ARG INSTALL_AUDIO_DEPS=false
+ARG INSTALL_YOUTUBE_DEPS=false
 
 WORKDIR /build
 COPY pyproject.toml ./
@@ -61,6 +62,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 #    torch 解析（torch 已由 qwen-asr[vllm] 鎖定）。
 RUN pip install "." \
     && if [ "$INSTALL_AUDIO_DEPS" = "true" ]; then pip install ".[audio]"; fi \
+    && if [ "$INSTALL_YOUTUBE_DEPS" = "true" ]; then pip install ".[youtube]"; fi \
     && if [ "$INSTALL_GPU_DEPS" = "true" ]; then \
          pip install ".[gpu]" \
          && pip install --no-deps \
