@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 import structlog
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
@@ -32,6 +31,7 @@ from app.services.asr.queue import AsrJob, QueueBackend, QueuePriority
 from app.services.audio import (
     FireRedVADService,
     Segment,
+    ensure_safe_audio_path,
     resample_to_16k_mono,
     store_upload,
     verify_mime,
@@ -116,8 +116,11 @@ async def _run_asr_pipeline(
 
     被 /transcribe（剛 store 的 audio）與 /transcribe-stored/{id}（既存 audio）共用。
     """
+    safe_path = ensure_safe_audio_path(
+        audio.storage_path, base_dir=settings.AUDIO_STORAGE_DIR
+    )
     resample = await resample_to_16k_mono(
-        Path(audio.storage_path),
+        safe_path,
         settings.AUDIO_STORAGE_DIR / "processed",
     )
     AudioFileRepository(db, api_key.id).update_after_resample(
