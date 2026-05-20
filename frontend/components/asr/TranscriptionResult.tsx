@@ -4,14 +4,22 @@ import { Card } from '@/components/ui/Card';
 interface Props {
   data: TranscribeData;
   /**
-   * 從前端按下「開始辨識」到收到 response 的牆鐘時間，包含檔案上傳、
-   * 網路往返、後端排隊、後端 pipeline 處理。與 backend 自報的
-   * `processing_duration_sec`（純 ASR pipeline）區隔開。
+   * 客戶端按下「開始辨識」到收到 response 的牆鐘時間，毫秒。
+   * 此值 ≈ 後端 pipeline 牆鐘（VAD + ASR 推理 + 對齊 + 語者分離 + 後處理）+
+   * 上傳/網路/反序列化。**後端目前只記錄 ASR 純推理的 processing_duration_sec**，
+   * 沒記其他 pipeline 段 timing，所以從這兩個數字推不出單一段花了多久。
+   * 改善需要 backend 為每段加 duration_ms event log（已列為 follow-up）。
    */
   clientElapsedMs?: number;
 }
 
 export function TranscriptionResult({ data, clientElapsedMs }: Props) {
+  // 給使用者直接看到的差距：客戶端往返 - ASR 純處理 = 其他 pipeline 段 + 網路。
+  const otherStagesSec =
+    clientElapsedMs !== undefined
+      ? Math.max(0, clientElapsedMs / 1000 - data.processing_duration_sec)
+      : undefined;
+
   return (
     <Card className="mt-4">
       <h2 className="text-lg font-semibold mb-4">辨識結果</h2>
@@ -25,14 +33,21 @@ export function TranscriptionResult({ data, clientElapsedMs }: Props) {
       <dl className="grid grid-cols-2 gap-2 text-sm text-foreground/70">
         <dt>音檔長度</dt>
         <dd>{data.duration_sec.toFixed(2)} 秒</dd>
-        <dt>ASR 後端純處理</dt>
-        <dd>{data.processing_duration_sec.toFixed(2)} 秒</dd>
+        <dt>ASR 純推理</dt>
+        <dd>
+          {data.processing_duration_sec.toFixed(2)} 秒
+          <span className="text-xs text-foreground/50 ml-1">（僅 ASR 模型）</span>
+        </dd>
         {clientElapsedMs !== undefined && (
           <>
-            <dt>客戶端總耗時</dt>
+            <dt>請求總往返</dt>
+            <dd>{(clientElapsedMs / 1000).toFixed(2)} 秒</dd>
+            <dt>其他 pipeline + 網路</dt>
             <dd>
-              {(clientElapsedMs / 1000).toFixed(2)} 秒
-              <span className="text-xs text-foreground/50 ml-1">（含上傳 / 網路 / 排隊）</span>
+              ≈ {otherStagesSec!.toFixed(2)} 秒
+              <span className="text-xs text-foreground/50 ml-1">
+                （VAD / 對齊 / 語者分離 / 上傳 / 反序列化合計，後端尚未拆分 timing）
+              </span>
             </dd>
           </>
         )}
