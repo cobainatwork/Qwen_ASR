@@ -43,6 +43,21 @@ def test_s2t_taiwan_vocab_phrase_level() -> None:
     assert convert_s2twp("用户优化体验") == "使用者最佳化體驗"
 
 
+def test_s2t_taiwan_vocab_tech_terms() -> None:
+    """OpenCC 1.3.x s2twp 對常見技術詞彙的覆蓋：滑鼠、記憶體、頻寬、伺服器、解析度。"""
+    assert convert_s2twp("鼠标和键盘") == "滑鼠和鍵盤"
+    assert convert_s2twp("内存条") == "記憶體條"
+    assert convert_s2twp("网络带宽") == "網路頻寬"
+    assert convert_s2twp("服务器") == "伺服器"
+
+
+def test_s2t_taiwan_overrides_strong_terms() -> None:
+    """Taiwan 強用語：OpenCC 給的「賬號 / 反饋 / 軟盤」由 overrides 補強。"""
+    assert convert_s2twp("登录账号") == "登入帳號"  # 账号 → 賬號（OpenCC）→ 帳號（override）
+    assert convert_s2twp("收集用户反馈") == "收集使用者回饋"  # 反馈 → 反饋（OpenCC）→ 回饋
+    assert convert_s2twp("插入软盘") == "插入軟碟"  # 软盘 → 軟盤 → 軟碟
+
+
 def test_s2t_already_traditional_unchanged() -> None:
     assert convert_s2twp("繁體中文不變") == "繁體中文不變"
 

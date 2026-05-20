@@ -22,10 +22,10 @@ dependencies = [
   "structlog>=24.4.0",
   "python-multipart>=0.0.17",
   # spec §6.1 step 4「簡繁轉換 s2twp.json」：post-processing 管線必經一步。
-  # 選 pure-Python reimplemented 套件（非 OpenCC C++ binding）跨平台無 build 依賴；
-  # 字典版本對 phrase-level 詞庫（如 質量/品質、賬號/帳號）覆蓋率約 70%，字級覆蓋 100%。
-  # 若需更新 phrase 詞庫，後續可考慮升 C++ OpenCC 或自寫補丁。
-  "opencc-python-reimplemented>=0.1.7",
+  # 採官方 OpenCC C++ binding（PyPI package name "opencc"，import 名同），字典
+  # 版本 1.3.x 涵蓋 ~89% Taiwan 詞彙；剩餘 OpenCC 認為「兩可」的詞（賬號、軟盤、
+  # 反饋）由 ``taiwan_overrides.py`` 補強 post-OpenCC mapping。
+  "opencc>=1.1.7,<2",
 ]
 
 [project.optional-dependencies]
