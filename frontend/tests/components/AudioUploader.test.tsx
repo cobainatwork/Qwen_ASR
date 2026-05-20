@@ -75,6 +75,20 @@ describe('AudioUploader', () => {
     expect(JSON.parse(optionsJson)).toEqual({ language: 'Chinese' });
   });
 
+  it('選檔時觸發 onFileSelected', async () => {
+    const onResult = jest.fn();
+    const onFileSelected = jest.fn();
+    render(
+      <AuthProvider>
+        <AudioUploader onResult={onResult} onFileSelected={onFileSelected} />
+      </AuthProvider>,
+    );
+    const file = new File(['fake'], 'a.wav', { type: 'audio/wav' });
+    const input = screen.getByLabelText('選擇音檔') as HTMLInputElement;
+    await userEvent.upload(input, file);
+    expect(onFileSelected).toHaveBeenCalledWith(file);
+  });
+
   it('default auto omits language from options_json', async () => {
     localStorage.setItem('qwen-asr-token', 'test-token');
     const onResult = jest.fn();

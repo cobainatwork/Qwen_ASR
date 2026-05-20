@@ -21,15 +21,8 @@ export function TranscriptionResult({ data, clientElapsedMs }: Props) {
       : undefined;
 
   return (
-    <Card className="mt-4">
-      <h2 className="text-lg font-semibold mb-4">辨識結果</h2>
-      {data.text ? (
-        <p className="whitespace-pre-wrap text-base mb-4">{data.text}</p>
-      ) : (
-        <p className="text-sm text-foreground/60 italic mb-4">
-          辨識結果為空字串（音檔可能無有效語音段，或全為靜音 / 噪音）
-        </p>
-      )}
+    <Card>
+      <h2 className="text-sm font-semibold mb-2">處理摘要</h2>
       <dl className="grid grid-cols-2 gap-2 text-sm text-foreground/70">
         <dt>音檔長度</dt>
         <dd>{data.duration_sec.toFixed(2)} 秒</dd>

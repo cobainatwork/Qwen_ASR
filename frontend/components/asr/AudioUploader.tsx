@@ -13,9 +13,10 @@ import { Card } from '@/components/ui/Card';
 interface Props {
   onResult: (data: TranscribeData, clientElapsedMs: number) => void;
   onTranscribeStart?: () => void;
+  onFileSelected?: (file: File | null) => void;
 }
 
-export function AudioUploader({ onResult, onTranscribeStart }: Props) {
+export function AudioUploader({ onResult, onTranscribeStart, onFileSelected }: Props) {
   const { token } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [language, setLanguage] = useState<string>('');
@@ -69,7 +70,11 @@ export function AudioUploader({ onResult, onTranscribeStart }: Props) {
       <input
         type="file"
         accept="audio/*,video/*"
-        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          setFile(f);
+          onFileSelected?.(f);
+        }}
         className="mb-4 block"
         aria-label="選擇音檔"
         disabled={loading}
