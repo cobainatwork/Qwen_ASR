@@ -14,11 +14,13 @@
     "generate-api": "tsx scripts/generate-api.ts"
   },
   "dependencies": {
+    "@wavesurfer/react": "^1.0.12",
     "lucide-react": "^0.460.0",
     "next": "14.2.18",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "swr": "2.2.5"
+    "swr": "2.2.5",
+    "wavesurfer.js": "^7.12.7"
   },
   "devDependencies": {
     "@playwright/test": "1.48.0",
