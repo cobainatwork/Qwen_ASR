@@ -44,41 +44,38 @@ export function TranscriptViewer({ data, currentTime, onSeek }: Props) {
             refs.current[i] = el;
           }}
           aria-current={i === activeIdx ? 'true' : undefined}
-          role="button"
-          tabIndex={0}
-          onClick={() => onSeek(seg.start)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onSeek(seg.start);
-            }
-          }}
-          className={`rounded-xl border px-3 py-2 cursor-pointer transition-colors ${
+          className={`rounded-xl border transition-colors ${
             i === activeIdx
               ? 'border-blue-400/60 bg-blue-50/70'
-              : 'border-foreground/10 bg-white/40 hover:bg-white/70'
+              : 'border-foreground/10 bg-white/40'
           }`}
         >
-          <div className="flex items-center gap-2 mb-1">
-            <span
-              className="inline-block rounded px-1.5 py-0.5 text-xs font-medium text-white"
-              style={{ backgroundColor: speakerColor(seg.speaker) }}
-            >
-              {seg.speaker}
-            </span>
-            <span className="font-mono text-xs text-foreground/60 tabular-nums">
-              {formatTimestamp(seg.start)} - {formatTimestamp(seg.end)}
-            </span>
-          </div>
-          <p
-            className="text-sm leading-relaxed whitespace-pre-wrap"
-            style={{
-              backgroundColor:
-                i === activeIdx ? speakerBgColor(seg.speaker) : 'transparent',
-            }}
+          <button
+            type="button"
+            onClick={() => onSeek(seg.start)}
+            className="block w-full text-left px-3 py-2 cursor-pointer hover:bg-white/30 rounded-xl"
           >
-            {seg.text || <span className="text-foreground/40 italic">（無文字）</span>}
-          </p>
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className="inline-block rounded px-1.5 py-0.5 text-xs font-medium text-white"
+                style={{ backgroundColor: speakerColor(seg.speaker) }}
+              >
+                {seg.speaker}
+              </span>
+              <span className="font-mono text-xs text-foreground/60 tabular-nums">
+                {formatTimestamp(seg.start)} - {formatTimestamp(seg.end)}
+              </span>
+            </div>
+            <p
+              className="text-sm leading-relaxed whitespace-pre-wrap"
+              style={{
+                backgroundColor:
+                  i === activeIdx ? speakerBgColor(seg.speaker) : 'transparent',
+              }}
+            >
+              {seg.text || <span className="text-foreground/40 italic">（無文字）</span>}
+            </p>
+          </button>
         </li>
       ))}
     </ol>

@@ -46,14 +46,18 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, Props>(function AudioPl
         e.preventDefault();
         toggle();
       } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
         seek(Math.max(0, currentTime - 5));
       } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
         seek(Math.min(duration, currentTime + 5));
       } else if (e.code === 'ArrowUp') {
+        e.preventDefault();
         const next = Math.min(1, volume + 0.1);
         setVolumeState(next);
         setVolume(next);
       } else if (e.code === 'ArrowDown') {
+        e.preventDefault();
         const next = Math.max(0, volume - 0.1);
         setVolumeState(next);
         setVolume(next);

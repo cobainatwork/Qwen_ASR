@@ -1,6 +1,7 @@
 import { toSrt } from '@/lib/export/srt';
 import { toVtt } from '@/lib/export/vtt';
 import { toJson } from '@/lib/export/json';
+import { sanitizeFilename } from '@/lib/export/download';
 import type { TranscribeData } from '@/lib/api/types';
 
 const baseData: TranscribeData = {
@@ -78,6 +79,21 @@ describe('toSrt sanitization', () => {
     const srt = toSrt(data);
     expect(srt).toContain('foo → bar');
     expect(srt.match(/-->/g)?.length).toBe(1); // 只有時間軸那一個 -->
+  });
+});
+
+describe('sanitizeFilename', () => {
+  it('strips slashes', () => {
+    expect(sanitizeFilename('a/b\\c.srt')).toBe('a_b_c.srt');
+  });
+  it('strips dotdot sequences', () => {
+    expect(sanitizeFilename('../../etc/passwd')).toBe('____etc_passwd');
+  });
+  it('strips control chars (space and dash)', () => {
+    expect(sanitizeFilename('a b.srt')).toBe('a_b.srt');
+  });
+  it('caps length at 200', () => {
+    expect(sanitizeFilename('a'.repeat(300)).length).toBe(200);
   });
 });
 

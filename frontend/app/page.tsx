@@ -43,6 +43,8 @@ export default function Page() {
         parsed.data !== null &&
         typeof parsed.data === 'object' &&
         'text' in parsed.data &&
+        'transcription_id' in parsed.data &&
+        typeof (parsed.data as { transcription_id: unknown }).transcription_id === 'number' &&
         'clientElapsedMs' in parsed &&
         typeof (parsed as { clientElapsedMs: unknown }).clientElapsedMs === 'number'
       ) {
