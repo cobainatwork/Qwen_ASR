@@ -167,7 +167,7 @@ export function YoutubeDownloader({ onTranscribed }: Props) {
                   transcribingId === d.audio_file_id
                 }
               >
-                {transcribingId === d.audio_file_id ? '辨識中...' : '辨識'}
+                {d.audio_file_id !== null && transcribingId === d.audio_file_id ? '辨識中...' : '辨識'}
               </Button>
             </li>
           ))}
