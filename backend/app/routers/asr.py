@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import structlog
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
@@ -141,9 +142,19 @@ async def _run_asr_pipeline(
     safe_path = ensure_safe_audio_path(
         audio.storage_path, base_dir=settings.AUDIO_STORAGE_DIR
     )
+
+    # ── Stage: resample ──────────────────────────────────────────────────
+    _t = time.monotonic()
     resample = await resample_to_16k_mono(
         safe_path,
         settings.AUDIO_STORAGE_DIR / "processed",
+    )
+    log.info(
+        "asr stage",
+        stage="resample",
+        duration_ms=(time.monotonic() - _t) * 1000,
+        original_sample_rate=resample.original_sample_rate,
+        duration_sec=resample.duration_sec,
     )
     AudioFileRepository(db, api_key.id).update_after_resample(
         audio.id,
@@ -152,12 +163,22 @@ async def _run_asr_pipeline(
     )
     db.commit()
 
+    # ── Stage: vad ───────────────────────────────────────────────────────
     # VAD_ENABLED=false 時跳過 VAD（套件未安裝或環境關閉），整段直送 ASR
     vad_segments: list[Segment] = []
+    _t = time.monotonic()
     if settings.VAD_ENABLED:
         vad_segments = await FireRedVADService.detect_speech(resample.output_path)
+    log.info(
+        "asr stage",
+        stage="vad",
+        duration_ms=(time.monotonic() - _t) * 1000,
+        enabled=settings.VAD_ENABLED,
+        segments_count=len(vad_segments),
+    )
 
-    # 入佇列等待
+    # ── Stage: queue_wait（含 _load_wav、asr inference、diarization、後處理、糾錯）─
+    _t = time.monotonic()
     job = AsrJob(
         audio_file_id=audio.id,
         api_key_id=api_key.id,
@@ -166,6 +187,11 @@ async def _run_asr_pipeline(
     )
     await queue.enqueue(job, QueuePriority.BATCH)
     transcription_id = await wait_for_job(job, timeout=settings.ASR_REQUEST_TIMEOUT_SEC)
+    log.info(
+        "asr stage",
+        stage="queue_wait",
+        duration_ms=(time.monotonic() - _t) * 1000,
+    )
 
     # 讀取結果（deferred import：避開 transcription → service → repository 循環）
     from app.repositories.transcription import TranscriptionRepository

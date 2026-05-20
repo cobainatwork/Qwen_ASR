@@ -118,9 +118,28 @@ class Transcriber:
         language: str | None = job.options.get("language")  # None = 自動偵測
         context_hint: str = job.options.get("hotword_context", "")  # M5 整合點
 
-        t0 = time.monotonic()
+        # ── Stage: wav_load ──────────────────────────────────────────────
+        _t = time.monotonic()
         try:
             wav_np, sample_rate = _load_wav_as_numpy(audio.storage_path)
+        except Exception as e:
+            err_name = type(e).__name__
+            err_str = str(e)
+            self.tx_repo.mark_failed(record.id, error_message=f"{err_name}: {e}")
+            self.db.commit()
+            raise AsrInferenceFailedError(details={"error": err_str}) from e
+        logger.info(
+            "asr stage",
+            stage="wav_load",
+            duration_ms=(time.monotonic() - _t) * 1000,
+            audio_file_id=audio.id,
+            sample_rate=sample_rate,
+            samples=int(wav_np.shape[0]),
+        )
+
+        # ── Stage: asr_inference ─────────────────────────────────────────
+        t0 = time.monotonic()
+        try:
             results: list[Any] = await asyncio.to_thread(
                 asr.transcribe,
                 audio=[(wav_np, sample_rate)],
@@ -138,6 +157,12 @@ class Transcriber:
             raise AsrInferenceFailedError(details={"error": err_str}) from e
 
         duration = time.monotonic() - t0
+        logger.info(
+            "asr stage",
+            stage="asr_inference",
+            duration_ms=duration * 1000,
+            audio_file_id=audio.id,
+        )
         result = results[0]
         text: str = result.text
         detected_language: str | None = getattr(result, "language", language)
@@ -164,6 +189,11 @@ class Transcriber:
         finetune_active = is_finetune_active(settings)
 
         # 1. Diarization（pyannote / CAM++ fallback；finetune_active 時強制 CAM++）
+        # ── Stage: diarization ───────────────────────────────────────────
+        _t = time.monotonic()
+        _diar_backend = "skipped"
+        _diar_status = "skipped"
+        _diar_speakers = 0
         if settings.DIARIZATION_ENABLED and not job.options.get("skip_diarization"):
             try:
                 segments, backend = await DiarizationService.diarize(Path(audio.storage_path))
@@ -171,24 +201,48 @@ class Transcriber:
                     {"speaker": s.speaker, "start": s.start_sec, "end": s.end_sec}
                     for s in segments
                 ]
+                _diar_backend = backend
+                _diar_status = "ok"
+                _diar_speakers = len({s.speaker for s in segments})
                 post_processing_metadata["diarization"] = {
                     "status": "ok",
                     "backend": backend,
-                    "speakers": len({s.speaker for s in segments}),
+                    "speakers": _diar_speakers,
                 }
             except Exception as e:
+                _diar_status = "failed"
                 post_processing_metadata["diarization"] = {
                     "status": "failed",
                     "error": str(e),
                 }
+        logger.info(
+            "asr stage",
+            stage="diarization",
+            duration_ms=(time.monotonic() - _t) * 1000,
+            audio_file_id=audio.id,
+            backend=_diar_backend,
+            status=_diar_status,
+            speakers=_diar_speakers,
+        )
 
         # 2. 後處理（標點 + 數字正規化）
+        # ── Stage: post_processing ───────────────────────────────────────
+        _t = time.monotonic()
         if settings.POST_PROCESSING_ENABLED:
             pp = run_post_processing(text)
             text = pp.final_text
             post_processing_metadata["post_processing"] = {"stages": pp.stages}
+        logger.info(
+            "asr stage",
+            stage="post_processing",
+            duration_ms=(time.monotonic() - _t) * 1000,
+            audio_file_id=audio.id,
+            enabled=settings.POST_PROCESSING_ENABLED,
+        )
 
         # 3. 糾錯四層（NEC → KenLM → 同音 → LLM；finetune_active 時 NEC/LLM 自動降級）
+        # ── Stage: correction ────────────────────────────────────────────
+        _t = time.monotonic()
         correction_options = CorrectionOptions(
             nec_enabled=settings.CORRECTION_NEC_ENABLED and not finetune_active,
             kenlm_enabled=settings.CORRECTION_KENLM_ENABLED,
@@ -197,15 +251,23 @@ class Transcriber:
                 settings.CORRECTION_LLM_BACKEND != "none" and not finetune_active
             ),
         )
-        if any([
+        _corr_ran = any([
             correction_options.nec_enabled,
             correction_options.kenlm_enabled,
             correction_options.homophone_enabled,
             correction_options.llm_enabled,
-        ]):
+        ])
+        if _corr_ran:
             corr = await run_correction_pipeline(text, correction_options)
             text = corr.final_text
             post_processing_metadata["correction"] = {"stages": corr.stages}
+        logger.info(
+            "asr stage",
+            stage="correction",
+            duration_ms=(time.monotonic() - _t) * 1000,
+            audio_file_id=audio.id,
+            enabled=_corr_ran,
+        )
 
         return_timestamps = job.options.get("return_timestamps", True)
         self.tx_repo.mark_completed(
