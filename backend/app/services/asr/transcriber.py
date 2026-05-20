@@ -232,6 +232,28 @@ class Transcriber:
             pp = run_post_processing(text)
             text = pp.final_text
             post_processing_metadata["post_processing"] = {"stages": pp.stages}
+            # 同步對 word-level timestamps 跑 s2t（標點與數字只作用於合併全文，
+            # 不對字級 entry 套用以免拆斷上下文）。前端 TranscriptViewer 拼字
+            # 使用 timestamps[].text，若不轉會呈現簡體文字。
+            if ts is not None:
+                from app.services.post_processing.s2t import convert_s2twp
+                converted_count = 0
+                for entry in ts:
+                    raw = entry.get("text", "")
+                    if raw:
+                        try:
+                            entry["text"] = convert_s2twp(raw)
+                            converted_count += 1
+                        except Exception as e:
+                            logger.warning(
+                                "timestamps s2t failed",
+                                error=str(e),
+                                raw=raw,
+                            )
+                post_processing_metadata["post_processing"]["timestamps_s2t"] = {
+                    "converted": converted_count,
+                    "total": len(ts),
+                }
         logger.info(
             "asr stage",
             stage="post_processing",
