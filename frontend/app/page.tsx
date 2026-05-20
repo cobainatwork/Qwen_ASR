@@ -12,6 +12,7 @@ type StoredResult = { data: TranscribeData; clientElapsedMs: number };
 
 export default function Page() {
   const [stored, setStored] = useState<StoredResult | null>(null);
+  const [isRehydrated, setIsRehydrated] = useState(false);
 
   useEffect(() => {
     try {
@@ -31,6 +32,7 @@ export default function Page() {
         typeof (parsed as { clientElapsedMs: unknown }).clientElapsedMs === 'number'
       ) {
         setStored(parsed as StoredResult);
+        setIsRehydrated(true);
       } else {
         sessionStorage.removeItem(STORAGE_KEY);
       }
@@ -41,6 +43,7 @@ export default function Page() {
 
   const handleTranscribeStart = () => {
     setStored(null);
+    setIsRehydrated(false);
     try {
       sessionStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -51,6 +54,7 @@ export default function Page() {
   const handleResult = (data: TranscribeData, clientElapsedMs: number) => {
     const next: StoredResult = { data, clientElapsedMs };
     setStored(next);
+    setIsRehydrated(false);
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     } catch {
@@ -58,10 +62,35 @@ export default function Page() {
     }
   };
 
+  const handleClear = () => {
+    setStored(null);
+    setIsRehydrated(false);
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // 靜默
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto px-6 py-6">
       <div className="max-w-2xl mx-auto">
         <AudioUploader onResult={handleResult} onTranscribeStart={handleTranscribeStart} />
+        {isRehydrated && stored && (
+          <div className="mt-4 flex items-center gap-3 rounded-xl border border-amber-300/60 bg-amber-50/70 backdrop-blur-sm px-4 py-2 text-xs text-amber-900">
+            <span aria-hidden>ⓘ</span>
+            <span className="flex-1">
+              此為先前紀錄（瀏覽器 sessionStorage 留存），重新上傳音檔才會反映 backend 最新設定。
+            </span>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="rounded-lg border border-amber-400/60 px-2 py-1 text-amber-900 hover:bg-amber-100/60 transition-colors cursor-pointer"
+            >
+              清除
+            </button>
+          </div>
+        )}
         {stored && (
           <TranscriptionResult data={stored.data} clientElapsedMs={stored.clientElapsedMs} />
         )}
