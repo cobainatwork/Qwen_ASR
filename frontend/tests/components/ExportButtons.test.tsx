@@ -8,7 +8,7 @@ const data: TranscribeData = {
   transcription_id: 1,
   audio_file_id: 2,
   text: '你好',
-  timestamps: [{ start: 0, end: 0.5, word: '你好' }],
+  timestamps: [{ start: 0, end: 0.5, text: '你好' }],
   speakers: null,
   diarization: null,
   language: null,

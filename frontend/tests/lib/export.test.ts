@@ -9,8 +9,8 @@ const baseData: TranscribeData = {
   audio_file_id: 2,
   text: '你好 世界',
   timestamps: [
-    { start: 0.0, end: 0.8, word: '你好' },
-    { start: 1.0, end: 2.0, word: '世界' },
+    { start: 0.0, end: 0.8, text: '你好' },
+    { start: 1.0, end: 2.0, text: '世界' },
   ],
   speakers: [
     { speaker: 'SPEAKER_00', start: 0, end: 1 },
@@ -58,7 +58,7 @@ describe('toSrt sanitization', () => {
   it('newline in text becomes space (preserves single cue)', () => {
     const data: TranscribeData = {
       transcription_id: 1, audio_file_id: 2, text: 'a\nb',
-      timestamps: [{ start: 0, end: 1, word: 'a\nb' }],
+      timestamps: [{ start: 0, end: 1, text: 'a\nb' }],
       speakers: null, diarization: null, language: null,
       duration_sec: 1, processing_duration_sec: 0, model_version: 'T',
       resampling_warning: false, vad_segments_count: 1, warnings: [],
@@ -71,7 +71,7 @@ describe('toSrt sanitization', () => {
   it('--> in text becomes → (preserves cue structure)', () => {
     const data: TranscribeData = {
       transcription_id: 1, audio_file_id: 2, text: 'foo --> bar',
-      timestamps: [{ start: 0, end: 1, word: 'foo --> bar' }],
+      timestamps: [{ start: 0, end: 1, text: 'foo --> bar' }],
       speakers: null, diarization: null, language: null,
       duration_sec: 1, processing_duration_sec: 0, model_version: 'T',
       resampling_warning: false, vad_segments_count: 1, warnings: [],
@@ -101,7 +101,7 @@ describe('toVtt sanitization', () => {
   it('HTML-escapes speaker name', () => {
     const data: TranscribeData = {
       transcription_id: 1, audio_file_id: 2, text: 'hi',
-      timestamps: [{ start: 0, end: 1, word: 'hi' }],
+      timestamps: [{ start: 0, end: 1, text: 'hi' }],
       speakers: [{ speaker: '<script>', start: 0, end: 1 }],
       diarization: null, language: null,
       duration_sec: 1, processing_duration_sec: 0, model_version: 'T',
@@ -115,7 +115,7 @@ describe('toVtt sanitization', () => {
   it('closes <v> tag with </v>', () => {
     const data: TranscribeData = {
       transcription_id: 1, audio_file_id: 2, text: 'hi',
-      timestamps: [{ start: 0, end: 1, word: 'hi' }],
+      timestamps: [{ start: 0, end: 1, text: 'hi' }],
       speakers: null, diarization: null, language: null,
       duration_sec: 1, processing_duration_sec: 0, model_version: 'T',
       resampling_warning: false, vad_segments_count: 1, warnings: [],

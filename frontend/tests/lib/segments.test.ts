@@ -13,8 +13,8 @@ describe('buildSegments', () => {
 
   it('有 timestamps 無 speakers：歸為單一 SPEAKER_00 turn 含全部 words', () => {
     const timestamps: Timestamp[] = [
-      { start: 0.0, end: 0.5, word: '你' },
-      { start: 0.5, end: 1.0, word: '好' },
+      { start: 0.0, end: 0.5, text: '你' },
+      { start: 0.5, end: 1.0, text: '好' },
     ];
     const segs = buildSegments(timestamps, null, '你好');
     expect(segs).toHaveLength(1);
@@ -29,22 +29,22 @@ describe('buildSegments', () => {
       { speaker: 'SPEAKER_01', start: 1, end: 2 },
     ];
     const timestamps: Timestamp[] = [
-      { start: 0.1, end: 0.5, word: 'A' },
-      { start: 0.6, end: 0.9, word: 'B' },
-      { start: 1.1, end: 1.5, word: 'C' },
-      { start: 1.6, end: 1.9, word: 'D' },
+      { start: 0.1, end: 0.5, text: 'A' },
+      { start: 0.6, end: 0.9, text: 'B' },
+      { start: 1.1, end: 1.5, text: 'C' },
+      { start: 1.6, end: 1.9, text: 'D' },
     ];
     const segs = buildSegments(timestamps, speakers, 'A B C D');
     expect(segs).toHaveLength(2);
     expect(segs[0].speaker).toBe('SPEAKER_00');
-    expect(segs[0].words.map((w) => w.word)).toEqual(['A', 'B']);
+    expect(segs[0].words.map((w) => w.text)).toEqual(['A', 'B']);
     expect(segs[1].speaker).toBe('SPEAKER_01');
-    expect(segs[1].words.map((w) => w.word)).toEqual(['C', 'D']);
+    expect(segs[1].words.map((w) => w.text)).toEqual(['C', 'D']);
   });
 
   it('word 跨 turn 邊界（落點 < first turn start）：歸到第一 turn', () => {
     const speakers: SpeakerTurn[] = [{ speaker: 'SPEAKER_00', start: 1, end: 2 }];
-    const timestamps: Timestamp[] = [{ start: 0.5, end: 0.9, word: 'edge' }];
+    const timestamps: Timestamp[] = [{ start: 0.5, end: 0.9, text: 'edge' }];
     const segs = buildSegments(timestamps, speakers, 'edge');
     expect(segs[0].words).toHaveLength(1);
   });
@@ -54,9 +54,9 @@ describe('buildSegments', () => {
       { speaker: 'SPEAKER_00', start: 0, end: 1 },
       { speaker: 'SPEAKER_01', start: 1, end: 2 },
     ];
-    const timestamps: Timestamp[] = [{ start: 2.5, end: 3, word: 'tail' }];
+    const timestamps: Timestamp[] = [{ start: 2.5, end: 3, text: 'tail' }];
     const segs = buildSegments(timestamps, speakers, 'tail');
-    expect(segs[1].words.map((w) => w.word)).toContain('tail');
+    expect(segs[1].words.map((w) => w.text)).toContain('tail');
     expect(segs[0].words).toHaveLength(0);
   });
 

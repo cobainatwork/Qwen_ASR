@@ -45,7 +45,7 @@ export function buildSegments(
   }
 
   for (const s of segments) {
-    s.text = s.words.length > 0 ? s.words.map((w) => w.word).join('') : '';
+    s.text = s.words.length > 0 ? s.words.map((w) => w.text).join('') : '';
   }
 
   // 無 timestamps 時把 fallbackText 放進唯一一段（呈現原始 ASR text）

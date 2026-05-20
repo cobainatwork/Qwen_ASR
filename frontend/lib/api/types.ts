@@ -22,7 +22,9 @@ export interface TranscribeOptions {
 export interface Timestamp {
   start: number;
   end: number;
-  word: string;
+  // backend `schemas/asr.py` 用 `text`（aligner word-level 對齊輸出 + DB JSONB key）。
+  // 此處保持與 backend 一致，避免 undefined.join('') 變空字串的 silent bug。
+  text: string;
 }
 
 export interface SpeakerTurn {
