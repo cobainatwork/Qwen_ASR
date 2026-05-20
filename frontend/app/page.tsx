@@ -16,9 +16,26 @@ export default function Page() {
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(STORAGE_KEY);
-      if (raw) setStored(JSON.parse(raw) as StoredResult);
+      if (!raw) return;
+      const parsed: unknown = JSON.parse(raw);
+      // Schema guard：早期 commit 直接存 TranscribeData，現在存 { data, clientElapsedMs }。
+      // 形狀不符就丟掉，避免 stored.data 為 undefined 時 TranscriptionResult 讀 data.text 炸。
+      if (
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        'data' in parsed &&
+        parsed.data !== null &&
+        typeof parsed.data === 'object' &&
+        'text' in parsed.data &&
+        'clientElapsedMs' in parsed &&
+        typeof (parsed as { clientElapsedMs: unknown }).clientElapsedMs === 'number'
+      ) {
+        setStored(parsed as StoredResult);
+      } else {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
     } catch {
-      // 解析失敗（手動竄改 / 舊格式），靜默忽略
+      try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* 配額/SecurityError 靜默 */ }
     }
   }, []);
 
