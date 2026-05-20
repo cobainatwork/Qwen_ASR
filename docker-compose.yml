@@ -94,6 +94,41 @@ services:
               device_ids: ['0']
               capabilities: [gpu]
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    image: qwen-asr-frontend:dev
+    container_name: qwen-asr-frontend
+    environment:
+      # /api/* rewrites go through Next.js dev server, which forwards to this URL
+      # using Docker's internal DNS (asr-backend → backend container).
+      BACKEND_BASE_URL: ${FRONTEND_BACKEND_BASE_URL:-http://asr-backend:8000}
+      # vendor profile shows the full sidebar (incl. Fine-tune submenu).
+      NEXT_PUBLIC_DEPLOYMENT_PROFILE: ${NEXT_PUBLIC_DEPLOYMENT_PROFILE:-vendor}
+      NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    volumes:
+      # Bind mount source from host so `git pull` on the host is enough to update
+      # the running dev server (Next.js Fast Refresh picks it up via polling).
+      - ./frontend:/app
+      # Named volumes for node_modules and .next so the host's Windows-built
+      # artefacts (if any) don't leak into the Linux container.
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
+    depends_on:
+      asr-backend:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   pgdata:
     name: qwen-asr-pgdata
+  frontend_node_modules:
+    name: qwen-asr-frontend-node-modules
+  frontend_next_cache:
+    name: qwen-asr-frontend-next-cache
