@@ -26,7 +26,7 @@ const factory = jest.fn((): FakeWaveSurfer => ({
   getDuration: jest.fn(() => 0),
   getCurrentTime: jest.fn(() => 0),
   destroy: jest.fn(),
-  load: jest.fn(() => Promise.resolve()),
+  load: jest.fn((_url: string) => Promise.resolve()),
 }));
 
 export default { create: factory };
