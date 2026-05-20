@@ -30,7 +30,14 @@ export function buildSegments(
 
   for (const w of wordList) {
     const idx = segments.findIndex((s) => w.start >= s.start && w.start < s.end);
-    const target = idx >= 0 ? segments[idx] : segments[0];
+    let target: Segment;
+    if (idx >= 0) {
+      target = segments[idx];
+    } else if (w.start < segments[0].start) {
+      target = segments[0];                            // 前緣 orphan：歸第一段
+    } else {
+      target = segments[segments.length - 1];          // 後緣 orphan：歸最後一段
+    }
     target.words.push(w);
   }
 

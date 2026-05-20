@@ -48,4 +48,15 @@ describe('buildSegments', () => {
     const segs = buildSegments(timestamps, speakers, 'edge');
     expect(segs[0].words).toHaveLength(1);
   });
+
+  it('word 落在 last turn end 之後：歸到最後一段（非 segments[0]）', () => {
+    const speakers: SpeakerTurn[] = [
+      { speaker: 'SPEAKER_00', start: 0, end: 1 },
+      { speaker: 'SPEAKER_01', start: 1, end: 2 },
+    ];
+    const timestamps: Timestamp[] = [{ start: 2.5, end: 3, word: 'tail' }];
+    const segs = buildSegments(timestamps, speakers, 'tail');
+    expect(segs[1].words.map((w) => w.word)).toContain('tail');
+    expect(segs[0].words).toHaveLength(0);
+  });
 });

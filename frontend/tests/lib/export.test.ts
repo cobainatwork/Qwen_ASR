@@ -52,3 +52,59 @@ describe('toJson', () => {
     expect(parsed.duration_sec).toBe(2.0);
   });
 });
+
+describe('toSrt sanitization', () => {
+  it('newline in text becomes space (preserves single cue)', () => {
+    const data: TranscribeData = {
+      transcription_id: 1, audio_file_id: 2, text: 'a\nb',
+      timestamps: [{ start: 0, end: 1, word: 'a\nb' }],
+      speakers: null, diarization: null, language: null,
+      duration_sec: 1, processing_duration_sec: 0, model_version: 'T',
+      resampling_warning: false, vad_segments_count: 1, warnings: [],
+    };
+    const srt = toSrt(data);
+    expect(srt).toContain('SPEAKER_00: a b');
+    expect(srt).not.toContain('a\nb');
+  });
+
+  it('--> in text becomes → (preserves cue structure)', () => {
+    const data: TranscribeData = {
+      transcription_id: 1, audio_file_id: 2, text: 'foo --> bar',
+      timestamps: [{ start: 0, end: 1, word: 'foo --> bar' }],
+      speakers: null, diarization: null, language: null,
+      duration_sec: 1, processing_duration_sec: 0, model_version: 'T',
+      resampling_warning: false, vad_segments_count: 1, warnings: [],
+    };
+    const srt = toSrt(data);
+    expect(srt).toContain('foo → bar');
+    expect(srt.match(/-->/g)?.length).toBe(1); // 只有時間軸那一個 -->
+  });
+});
+
+describe('toVtt sanitization', () => {
+  it('HTML-escapes speaker name', () => {
+    const data: TranscribeData = {
+      transcription_id: 1, audio_file_id: 2, text: 'hi',
+      timestamps: [{ start: 0, end: 1, word: 'hi' }],
+      speakers: [{ speaker: '<script>', start: 0, end: 1 }],
+      diarization: null, language: null,
+      duration_sec: 1, processing_duration_sec: 0, model_version: 'T',
+      resampling_warning: false, vad_segments_count: 1, warnings: [],
+    };
+    const vtt = toVtt(data);
+    expect(vtt).toContain('&lt;script&gt;');
+    expect(vtt).not.toContain('<script>');
+  });
+
+  it('closes <v> tag with </v>', () => {
+    const data: TranscribeData = {
+      transcription_id: 1, audio_file_id: 2, text: 'hi',
+      timestamps: [{ start: 0, end: 1, word: 'hi' }],
+      speakers: null, diarization: null, language: null,
+      duration_sec: 1, processing_duration_sec: 0, model_version: 'T',
+      resampling_warning: false, vad_segments_count: 1, warnings: [],
+    };
+    const vtt = toVtt(data);
+    expect(vtt).toContain('</v>');
+  });
+});

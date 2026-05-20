@@ -1,7 +1,7 @@
-const clamp = (v: number) => (v < 0 ? 0 : v);
+const sanitize = (v: number) => (Number.isFinite(v) && v > 0 ? v : 0);
 
 export function formatTimestamp(seconds: number): string {
-  const s = clamp(seconds);
+  const s = sanitize(seconds);
   const totalMin = Math.floor(s / 60);
   const rem = s - totalMin * 60;
   const secInt = Math.floor(rem);
@@ -10,7 +10,7 @@ export function formatTimestamp(seconds: number): string {
 }
 
 export function formatDuration(seconds: number): string {
-  const s = clamp(Math.floor(seconds));
+  const s = sanitize(Math.floor(seconds));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
@@ -21,7 +21,7 @@ export function formatDuration(seconds: number): string {
 }
 
 function hmsms(seconds: number, msSep: ',' | '.'): string {
-  const s = clamp(seconds);
+  const s = sanitize(seconds);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = Math.floor(s % 60);

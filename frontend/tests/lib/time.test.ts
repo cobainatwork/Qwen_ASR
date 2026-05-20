@@ -23,3 +23,9 @@ describe('formatVttTimestamp (00:00:00.000)', () => {
   it('1.234 秒', () => expect(formatVttTimestamp(1.234)).toBe('00:00:01.234'));
   it('跨小時', () => expect(formatVttTimestamp(3661.5)).toBe('01:01:01.500'));
 });
+
+describe('formatTimestamp 非有限數', () => {
+  it('NaN → 00:00.0', () => expect(formatTimestamp(NaN)).toBe('00:00.0'));
+  it('Infinity → 00:00.0', () => expect(formatTimestamp(Infinity)).toBe('00:00.0'));
+  it('-Infinity → 00:00.0', () => expect(formatTimestamp(-Infinity)).toBe('00:00.0'));
+});
