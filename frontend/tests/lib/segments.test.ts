@@ -59,4 +59,26 @@ describe('buildSegments', () => {
     expect(segs[1].words.map((w) => w.word)).toContain('tail');
     expect(segs[0].words).toHaveLength(0);
   });
+
+  it('無 timestamps 但有 speakers：忽略 speakers 回單段含全文（不切空段）', () => {
+    // 真實情境：長音檔超過 aligner 5 min 限制，timestamps=null 但 diarization 仍跑出多段。
+    // 不能硬切（沒對齊資訊無法把全文落到對應 turn），改回單段呈現整段文字。
+    const speakers: SpeakerTurn[] = [
+      { speaker: 'SPEAKER_00', start: 0, end: 300 },
+      { speaker: 'SPEAKER_01', start: 300, end: 600 },
+    ];
+    const segs = buildSegments(null, speakers, '完整的辨識文字');
+    expect(segs).toHaveLength(1);
+    expect(segs[0].text).toBe('完整的辨識文字');
+  });
+
+  it('空 timestamps array 視同無 timestamps', () => {
+    const speakers: SpeakerTurn[] = [
+      { speaker: 'SPEAKER_00', start: 0, end: 10 },
+      { speaker: 'SPEAKER_01', start: 10, end: 20 },
+    ];
+    const segs = buildSegments([], speakers, 'fallback');
+    expect(segs).toHaveLength(1);
+    expect(segs[0].text).toBe('fallback');
+  });
 });

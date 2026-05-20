@@ -13,12 +13,15 @@ export function buildSegments(
   speakers: SpeakerTurn[] | null | undefined,
   fallbackText: string,
 ): Segment[] {
-  const turns: SpeakerTurn[] =
-    speakers && speakers.length > 0
-      ? speakers
-      : [{ speaker: 'SPEAKER_00', start: 0, end: timestamps?.at(-1)?.end ?? 0 }];
-
   const wordList: Timestamp[] = timestamps ?? [];
+  const hasWords = wordList.length > 0;
+
+  // 無 word-level timestamps（aligner 沒跑 / 超過 5 min 限制）時，speakers 即使有
+  // 也無法把全文切到各 turn —— 硬切會誤導使用者；改回單段 SPEAKER_00 含全文。
+  const turns: SpeakerTurn[] =
+    hasWords && speakers && speakers.length > 0
+      ? speakers
+      : [{ speaker: 'SPEAKER_00', start: 0, end: wordList.at(-1)?.end ?? 0 }];
 
   const segments: Segment[] = turns.map((turn) => ({
     speaker: turn.speaker,
@@ -45,8 +48,8 @@ export function buildSegments(
     s.text = s.words.length > 0 ? s.words.map((w) => w.word).join('') : '';
   }
 
-  // 沒 timestamps 時把 fallbackText 放進唯一一段（呈現原始 ASR text）
-  if (wordList.length === 0 && segments.length === 1) {
+  // 無 timestamps 時把 fallbackText 放進唯一一段（呈現原始 ASR text）
+  if (!hasWords && segments.length === 1) {
     segments[0].text = fallbackText;
   }
 

@@ -132,11 +132,16 @@ export default function Page() {
       <div className="asr-transcript-area">
         {stored ? (
           <>
-            <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-foreground/10 sticky top-0 bg-white/70 backdrop-blur-sm z-10">
+            <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-foreground/10 sticky top-0 bg-white/80 backdrop-blur-sm z-10">
               <ExportButtons data={stored.data} baseFilename={`transcription-${stored.data.transcription_id}`} />
-              <TranscriptionResult data={stored.data} clientElapsedMs={stored.clientElapsedMs} />
+              <span className="text-xs text-foreground/60 font-mono tabular-nums">
+                {stored.data.duration_sec.toFixed(1)}s · {stored.data.vad_segments_count} VAD · {stored.data.model_version}
+              </span>
             </div>
             <TranscriptViewer data={stored.data} currentTime={currentTime} onSeek={handleSeekFromTranscript} />
+            <div className="px-4 py-3 border-t border-foreground/10">
+              <TranscriptionResult data={stored.data} clientElapsedMs={stored.clientElapsedMs} />
+            </div>
           </>
         ) : (
           <div className="h-full flex items-center justify-center text-sm text-foreground/50 italic">
