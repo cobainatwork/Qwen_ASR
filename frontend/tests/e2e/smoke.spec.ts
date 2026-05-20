@@ -48,4 +48,15 @@ test.describe('Frontend smoke (shell + nav)', () => {
     expect(body.success).toBe(true);
     expect(Array.isArray(body.data)).toBe(true);
   });
+
+  test('ASR workspace shows upload + waveform placeholder + transcript placeholder', async ({ page }) => {
+    await page.goto('/');
+    // 三段都應該在 DOM
+    await expect(page.locator('.asr-page')).toBeVisible();
+    await expect(page.locator('.asr-upload-area')).toBeVisible();
+    await expect(page.locator('.asr-waveform-area')).toBeVisible();
+    await expect(page.locator('.asr-transcript-area')).toBeVisible();
+    // 未上傳時 waveform 區顯示提示
+    await expect(page.locator('.asr-waveform-area')).toContainText('上傳音檔');
+  });
 });
