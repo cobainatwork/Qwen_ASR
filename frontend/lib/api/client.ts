@@ -7,6 +7,10 @@ interface ApiClientOptions {
   getToken?: () => string | null;
 }
 
+interface RequestExtras {
+  idempotencyKey?: string;
+}
+
 export class ApiError extends Error {
   constructor(public code: string, message: string, public status: number) {
     super(message);
@@ -23,15 +27,20 @@ export class ApiClient {
     this.getToken = options.getToken ?? (() => null);
   }
 
-  async transcribe(file: File, options: { language?: string; return_timestamps?: boolean } = {}): Promise<TranscribeData> {
+  async transcribe(
+    file: File,
+    options: { language?: string; return_timestamps?: boolean } = {},
+    extras: RequestExtras = {},
+  ): Promise<TranscribeData> {
     const form = new FormData();
     form.append('file', file);
     form.append('options_json', JSON.stringify(options));
 
-    const body = await this.request<TranscribeData>('/api/v1/asr/transcribe', {
-      method: 'POST',
-      body: form,
-    });
+    const body = await this.request<TranscribeData>(
+      '/api/v1/asr/transcribe',
+      { method: 'POST', body: form },
+      extras,
+    );
     return body;
   }
 
@@ -39,21 +48,27 @@ export class ApiClient {
   async transcribeStored(
     audioFileId: number,
     options: { language?: string; return_timestamps?: boolean } = {},
+    extras: RequestExtras = {},
   ): Promise<TranscribeData> {
     const form = new FormData();
     form.append('options_json', JSON.stringify(options));
     return this.request<TranscribeData>(
       `/api/v1/asr/transcribe-stored/${audioFileId}`,
       { method: 'POST', body: form },
+      extras,
     );
   }
 
-  async youtubeDownload(url: string): Promise<YoutubeDownloadData> {
-    return this.request<YoutubeDownloadData>('/api/v1/dataset/youtube/download', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-    });
+  async youtubeDownload(url: string, extras: RequestExtras = {}): Promise<YoutubeDownloadData> {
+    return this.request<YoutubeDownloadData>(
+      '/api/v1/dataset/youtube/download',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      },
+      extras,
+    );
   }
 
   async listYoutubeDownloads(
@@ -76,7 +91,7 @@ export class ApiClient {
     );
   }
 
-  private async request<T>(path: string, init: RequestInit): Promise<T> {
+  private async request<T>(path: string, init: RequestInit, extras: RequestExtras = {}): Promise<T> {
     const token = this.getToken();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
@@ -87,6 +102,7 @@ export class ApiClient {
         signal: controller.signal,
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(extras.idempotencyKey ? { 'Idempotency-Key': extras.idempotencyKey } : {}),
           ...(init.headers ?? {}),
         },
       });

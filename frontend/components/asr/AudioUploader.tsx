@@ -48,9 +48,11 @@ export function AudioUploader({ onResult, onTranscribeStart, onFileSelected }: P
     const client = new ApiClient({ getToken: () => token });
     const startedAt = performance.now();
     try {
-      const data = await client.transcribe(file, {
-        language: language || undefined,
-      });
+      const data = await client.transcribe(
+        file,
+        { language: language || undefined },
+        { idempotencyKey: crypto.randomUUID() },
+      );
       const clientElapsedMs = Math.round(performance.now() - startedAt);
       onResult(data, clientElapsedMs);
     } catch (err) {

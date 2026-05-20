@@ -64,7 +64,7 @@ export function YoutubeDownloader({ onTranscribed }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      await client.youtubeDownload(url.trim());
+      await client.youtubeDownload(url.trim(), { idempotencyKey: crypto.randomUUID() });
       setUrl('');
       await refresh();
     } catch (err) {
@@ -83,9 +83,11 @@ export function YoutubeDownloader({ onTranscribed }: Props) {
     setTranscribingId(audioFileId);
     setError(null);
     try {
-      const data = await client.transcribeStored(audioFileId, {
-        language: language || undefined,
-      });
+      const data = await client.transcribeStored(
+        audioFileId,
+        { language: language || undefined },
+        { idempotencyKey: crypto.randomUUID() },
+      );
       onTranscribed(data);
     } catch (err) {
       if (err instanceof ApiError) {
