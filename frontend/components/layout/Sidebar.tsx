@@ -69,7 +69,7 @@ export function Sidebar() {
         ))}
 
         {isVendor && (
-          <div className="mt-2">
+          <div className="mt-3 pt-3 border-t border-foreground/15">
             <div className="flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-wide text-foreground/50">
               <Wrench className="w-3 h-3" />
               <span>Fine-tune</span>
@@ -80,7 +80,7 @@ export function Sidebar() {
           </div>
         )}
 
-        <div className="mt-2 pt-2 border-t border-white/40">
+        <div className="mt-3 pt-3 border-t border-foreground/15">
           {TAIL.map((item) => (
             <NavLink key={item.href} item={item} active={isActive(item.href)} />
           ))}
