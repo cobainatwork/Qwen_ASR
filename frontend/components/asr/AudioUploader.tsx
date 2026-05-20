@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { ApiClient, ApiError } from '@/lib/api/client';
 import { LANGUAGE_OPTIONS } from '@/lib/api/languages';
 import type { TranscribeData } from '@/lib/api/types';
+import { randomUuid } from '@/lib/uuid';
 import { useAuth } from '@/components/auth/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -51,7 +52,7 @@ export function AudioUploader({ onResult, onTranscribeStart, onFileSelected }: P
       const data = await client.transcribe(
         file,
         { language: language || undefined },
-        { idempotencyKey: crypto.randomUUID() },
+        { idempotencyKey: randomUuid() },
       );
       const clientElapsedMs = Math.round(performance.now() - startedAt);
       onResult(data, clientElapsedMs);

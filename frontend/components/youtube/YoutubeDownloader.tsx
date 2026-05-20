@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { ApiClient, ApiError } from '@/lib/api/client';
 import { LANGUAGE_OPTIONS } from '@/lib/api/languages';
 import type { TranscribeData, YoutubeDownloadData } from '@/lib/api/types';
+import { randomUuid } from '@/lib/uuid';
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -64,7 +65,7 @@ export function YoutubeDownloader({ onTranscribed }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      await client.youtubeDownload(url.trim(), { idempotencyKey: crypto.randomUUID() });
+      await client.youtubeDownload(url.trim(), { idempotencyKey: randomUuid() });
       setUrl('');
       await refresh();
     } catch (err) {
@@ -86,7 +87,7 @@ export function YoutubeDownloader({ onTranscribed }: Props) {
       const data = await client.transcribeStored(
         audioFileId,
         { language: language || undefined },
-        { idempotencyKey: crypto.randomUUID() },
+        { idempotencyKey: randomUuid() },
       );
       onTranscribed(data);
     } catch (err) {
