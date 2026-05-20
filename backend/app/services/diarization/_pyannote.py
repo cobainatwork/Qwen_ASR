@@ -60,15 +60,25 @@ def load_pyannote(hf_token: str | None) -> Any:
     try:
         _patch_torchaudio_for_pyannote()
         _patch_torch_load_for_pyannote()
+        import torch
         from pyannote.audio import Pipeline  # type: ignore[import-not-found]
     except ImportError as e:
         raise RuntimeError("pyannote.audio 套件未安裝") from e
 
     logger.info("loading pyannote.audio speaker diarization pipeline")
-    return Pipeline.from_pretrained(
+    pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
         use_auth_token=hf_token,
     )
+    # ``Pipeline.from_pretrained`` 不會自動把內部 segmentation / embedding 模型
+    # 搬到 GPU；實測 10 min × 6 speakers 在 CPU 路徑跑 383 sec，與 spec §3.3.3
+    # 「pyannote.audio（GPU）」+ 本檔頂部「VRAM ~2 GB」的隱含 GPU 承諾不符。
+    # 顯式 ``.to(cuda)`` 是強制 GPU 路徑的唯一方法；CUDA 不可用時退回 CPU，
+    # 並 log 出實際 device 讓後續 stage timing 能與 GPU 預期值對照。
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pipeline.to(device)
+    logger.info("pyannote pipeline device", device=str(device))
+    return pipeline
 
 
 def run_pyannote(pipeline: Any, wav_path: str) -> list[tuple[str, float, float]]:
