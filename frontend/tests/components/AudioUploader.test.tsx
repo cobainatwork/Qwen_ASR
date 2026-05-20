@@ -53,7 +53,7 @@ describe('AudioUploader', () => {
     await userEvent.click(screen.getByRole('button', { name: '開始辨識' }));
 
     await waitFor(() => expect(onResult).toHaveBeenCalled());
-    expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ text: '測試文字' }));
+    expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ text: '測試文字' }), expect.any(Number));
   });
 
   it('selecting Chinese sends language: "Chinese" in options_json', async () => {
