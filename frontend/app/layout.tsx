@@ -2,7 +2,7 @@ import './globals.css';
 import { Inter } from 'next/font/google';
 
 import { AppShell } from '@/components/layout/AppShell';
-import { AuthProvider } from '@/components/auth/AuthProvider';
+import { Providers } from './providers';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -20,9 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-Hant" className={inter.variable}>
       <body className="font-sans">
-        <AuthProvider>
+        <Providers>
           <AppShell>{children}</AppShell>
-        </AuthProvider>
+        </Providers>
       </body>
     </html>
   );

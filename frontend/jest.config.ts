@@ -12,6 +12,7 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/$1',
     '^wavesurfer\\.js$': '<rootDir>/__mocks__/wavesurfer.js.ts',
     '^@wavesurfer/react$': '<rootDir>/__mocks__/@wavesurfer/react.tsx',
+    '^idb-keyval$': '<rootDir>/__mocks__/idb-keyval.ts',
   },
   testMatch: ['<rootDir>/tests/**/*.test.{ts,tsx}'],
 };
