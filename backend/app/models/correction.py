@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+import sqlalchemy as sa
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TenantMixin
@@ -43,6 +44,10 @@ class CorrectionSegment(Base):
     end_sec: Mapped[float] = mapped_column(Float, nullable=False)
     original_text: Mapped[str] = mapped_column(Text, nullable=False)
     corrected_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    speaker_label: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_skipped: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=sa.text("false")
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

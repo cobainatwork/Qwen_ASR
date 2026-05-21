@@ -45,6 +45,8 @@ def _to_segment(seg: CorrectionSegment) -> CorrectionSegmentData:
         end_sec=seg.end_sec,
         original_text=seg.original_text,
         corrected_text=seg.corrected_text,
+        speaker_label=seg.speaker_label,
+        is_skipped=seg.is_skipped,
         version=seg.version,
         updated_at=seg.updated_at,
     )
@@ -114,6 +116,7 @@ def update_segment(
         segment_id,
         expected_version=payload.expected_version,
         corrected_text=payload.corrected_text,
+        is_skipped=payload.is_skipped,
     )
     db.commit()
     return success(_to_segment(updated))

@@ -63,9 +63,10 @@ class CorrectionSegmentRepository:
         segment_id: int,
         *,
         expected_version: int,
-        corrected_text: str,
+        corrected_text: str | None = None,
+        is_skipped: bool | None = None,
     ) -> CorrectionSegment:
-        """Optimistic Locking 更新段落校正文字。
+        """Optimistic Locking 更新段落校正文字與 skip 狀態。
 
         版本不符時拋 CorrectionVersionMismatchError，
         details 包含 expected_version / actual_version 供前端判斷。
@@ -86,7 +87,10 @@ class CorrectionSegmentRepository:
                     "actual_version": seg.version,
                 },
             )
-        seg.corrected_text = corrected_text
+        if corrected_text is not None:
+            seg.corrected_text = corrected_text
+        if is_skipped is not None:
+            seg.is_skipped = is_skipped
         seg.version = seg.version + 1
         self.db.flush()
         return seg
