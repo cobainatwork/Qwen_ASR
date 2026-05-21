@@ -17,6 +17,7 @@ from app.middleware import (
     tracing_middleware,
 )
 from app.routers.asr import router as asr_router
+from app.routers.audio import router as audio_router
 from app.routers.dataset import router as dataset_router
 from app.routers.health import router as health_router
 from app.routers.hotword import router as hotword_router
@@ -124,6 +125,7 @@ def _configure_app(settings: Settings) -> FastAPI:
     register_exception_handlers(app)
     app.include_router(health_router)
     app.include_router(asr_router)
+    app.include_router(audio_router)
     app.include_router(hotword_router)
     app.include_router(dataset_router)
     app.include_router(ws_router)
