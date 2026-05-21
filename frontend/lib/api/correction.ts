@@ -11,6 +11,7 @@ const DEFAULT_TIMEOUT_MS = 1_200_000; // 對齊 M6 client.ts ASR_REQUEST_TIMEOUT
 export interface CorrectionSession {
   id: number;
   transcription_id: number;
+  audio_file_id: number | null;
   name: string;
   status: string;
   created_at: string;

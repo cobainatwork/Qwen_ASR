@@ -16,6 +16,7 @@ class QualityEvalData(BaseModel):
 class CorrectionSessionData(BaseModel):
     id: int
     transcription_id: int
+    audio_file_id: int | None
     name: str
     status: str
     created_at: datetime

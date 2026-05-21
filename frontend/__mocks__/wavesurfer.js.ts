@@ -13,6 +13,7 @@ export interface FakeWaveSurfer {
   getCurrentTime: jest.Mock<number, []>;
   destroy: jest.Mock;
   load: jest.Mock<Promise<void>, [string]>;
+  zoom: jest.Mock;
 }
 
 const factory = jest.fn((): FakeWaveSurfer => ({
@@ -27,6 +28,7 @@ const factory = jest.fn((): FakeWaveSurfer => ({
   getCurrentTime: jest.fn(() => 0),
   destroy: jest.fn(),
   load: jest.fn((_url: string) => Promise.resolve()),
+  zoom: jest.fn(),
 }));
 
 export default { create: factory };

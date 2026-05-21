@@ -5,6 +5,7 @@ const RegionsPlugin = {
   create: jest.fn(() => ({
     addRegion: jest.fn(),
     on: jest.fn(),
+    off: jest.fn(),
     destroy: jest.fn(),
     getRegions: jest.fn(() => []),
   })),

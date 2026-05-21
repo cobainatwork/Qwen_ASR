@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import CorrectionSessionNotFoundError
@@ -9,6 +10,7 @@ from app.core.response import success
 from app.deps.auth import require_scope
 from app.deps.db import get_db
 from app.models import ApiKey, CorrectionSegment, CorrectionSession
+from app.models.audio_file import AudioFile
 from app.repositories.correction import (
     CorrectionSegmentRepository,
     CorrectionSessionRepository,
@@ -30,10 +32,27 @@ from app.services.correction.quality_evaluator import evaluate_session_quality
 router = APIRouter(prefix="/api/v1/correction", tags=["correction"])
 
 
-def _to_session(s: CorrectionSession) -> CorrectionSessionData:
+def _get_audio_file_id(db: Session, transcription_id: int, api_key_id: int) -> int | None:
+    """Fetch the audio_file.id whose transcription_id matches the given transcription.
+
+    Scoped to tenant (api_key_id) to prevent cross-tenant data leakage.
+    Returns None when no matching AudioFile exists.
+    """
+    row = db.execute(
+        select(AudioFile.id)
+        .where(AudioFile.transcription_id == transcription_id)
+        .where(AudioFile.api_key_id == api_key_id)
+        .limit(1)
+    ).scalar_one_or_none()
+    return row
+
+
+def _to_session(s: CorrectionSession, db: Session, api_key_id: int) -> CorrectionSessionData:
+    audio_file_id = _get_audio_file_id(db, s.transcription_id, api_key_id)
     return CorrectionSessionData(
         id=s.id,
         transcription_id=s.transcription_id,
+        audio_file_id=audio_file_id,
         name=s.name,
         status=s.status,
         created_at=s.created_at,
@@ -67,7 +86,7 @@ def get_session(
     sess = repo.get(session_id)
     if sess is None:
         raise CorrectionSessionNotFoundError(details={"session_id": session_id})
-    return success(_to_session(sess))
+    return success(_to_session(sess, db, api_key.id))
 
 
 @router.get(
