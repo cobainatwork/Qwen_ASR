@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import CorrectionSessionNotFoundError
@@ -19,8 +20,12 @@ from app.schemas.correction import (
     CorrectionSessionData,
     ExportToDatasetData,
     ExportToDatasetRequest,
+    QualityEvalData,
 )
+from app.services.correction.excel_exporter import session_to_excel_bytes
 from app.services.correction.exporter import export_session_to_dataset
+from app.services.correction.jsonl_exporter import session_to_jsonl
+from app.services.correction.quality_evaluator import evaluate_session_quality
 
 router = APIRouter(prefix="/api/v1/correction", tags=["correction"])
 
@@ -140,3 +145,57 @@ def export_to_dataset(
     )
     db.commit()
     return success(ExportToDatasetData(inserted_count=inserted, dataset_id=payload.dataset_id))
+
+
+@router.post("/sessions/{session_id}/export-jsonl")
+def export_jsonl(
+    session_id: int,
+    api_key: ApiKey = Depends(require_scope("asr:write")),
+    db: Session = Depends(get_db),
+) -> Response:
+    sess = CorrectionSessionRepository(db, api_key.id).get(session_id)
+    if sess is None:
+        raise CorrectionSessionNotFoundError(details={"session_id": session_id})
+    payload = session_to_jsonl(db, session_id, api_key.id)
+    return Response(
+        content=payload,
+        media_type="application/x-ndjson",
+        headers={
+            "Content-Disposition": f'attachment; filename="correction_session_{session_id}.jsonl"'
+        },
+    )
+
+
+@router.post("/sessions/{session_id}/export-excel")
+def export_excel(
+    session_id: int,
+    api_key: ApiKey = Depends(require_scope("asr:write")),
+    db: Session = Depends(get_db),
+) -> Response:
+    sess = CorrectionSessionRepository(db, api_key.id).get(session_id)
+    if sess is None:
+        raise CorrectionSessionNotFoundError(details={"session_id": session_id})
+    raw = session_to_excel_bytes(db, session_id, api_key.id)
+    return Response(
+        content=raw,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="correction_session_{session_id}.xlsx"'
+        },
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/evaluate-quality",
+    response_model=ResponseEnvelope[QualityEvalData],
+)
+def evaluate_quality(
+    session_id: int,
+    api_key: ApiKey = Depends(require_scope("asr:write")),
+    db: Session = Depends(get_db),
+) -> ResponseEnvelope[QualityEvalData]:
+    sess = CorrectionSessionRepository(db, api_key.id).get(session_id)
+    if sess is None:
+        raise CorrectionSessionNotFoundError(details={"session_id": session_id})
+    result = evaluate_session_quality(db, session_id, api_key.id)
+    return success(QualityEvalData(**result))

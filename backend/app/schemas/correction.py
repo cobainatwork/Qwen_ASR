@@ -3,6 +3,16 @@ from datetime import datetime
 from pydantic import BaseModel, Field, model_validator
 
 
+class QualityEvalIssue(BaseModel):
+    code: str
+    message: str | None = None
+
+
+class QualityEvalData(BaseModel):
+    score: float
+    issues: list[QualityEvalIssue]
+
+
 class CorrectionSessionData(BaseModel):
     id: int
     transcription_id: int
