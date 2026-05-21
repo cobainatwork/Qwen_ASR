@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.exceptions import CorrectionSessionNotFoundError
 from app.core.response import success
 from app.deps.auth import require_scope
 from app.deps.db import get_db
 from app.models import ApiKey, CorrectionSegment, CorrectionSession
 from app.models.audio_file import AudioFile
+from app.models.transcription import Transcription
 from app.repositories.correction import (
     CorrectionSegmentRepository,
     CorrectionSessionRepository,
@@ -218,3 +220,58 @@ def evaluate_quality(
         raise CorrectionSessionNotFoundError(details={"session_id": session_id})
     result = evaluate_session_quality(db, session_id, api_key.id)
     return success(QualityEvalData(**result))
+
+
+# ---------------------------------------------------------------------------
+# Test-only seed endpoint — only enabled when ENV != "production".
+# Used by Playwright E2E fixtures to create a correction session with
+# pre-populated segments without needing a real audio upload.
+# ---------------------------------------------------------------------------
+@router.post("/sessions/_test/seed")
+def test_seed_session(
+    api_key: ApiKey = Depends(require_scope("asr:write")),
+    db: Session = Depends(get_db),
+    segment_count: int = 3,
+) -> ResponseEnvelope[dict[str, int]]:
+    """建立測試用 CorrectionSession 與 N 個假段落（僅非 production 環境啟用）。"""
+    settings = get_settings()
+    if settings.ENV == "production":
+        raise HTTPException(status_code=404, detail="not found")
+
+    # 建立一個佔位 Transcription（source=upload, status=completed）
+    txn = Transcription(
+        api_key_id=api_key.id,
+        file_name="e2e_fixture.wav",
+        source="upload",
+        duration_sec=float(segment_count * 10),
+        language="zh",
+        model_name="test-model",
+        model_version="0.0.0",
+        status="completed",
+        transcript_text="E2E fixture transcription",
+    )
+    db.add(txn)
+    db.flush()
+
+    sess = CorrectionSession(
+        api_key_id=api_key.id,
+        transcription_id=txn.id,
+        name="E2E Fixture Session",
+        status="in_progress",
+    )
+    db.add(sess)
+    db.flush()
+
+    seg_repo = CorrectionSegmentRepository(db, api_key.id)
+    segments_data = [
+        {
+            "start_sec": float(i * 10),
+            "end_sec": float((i + 1) * 10),
+            "text": f"原始文字段落 {i + 1}",
+        }
+        for i in range(segment_count)
+    ]
+    seg_repo.bulk_create(sess.id, segments_data)
+    db.commit()
+
+    return success({"session_id": sess.id, "transcription_id": txn.id})
