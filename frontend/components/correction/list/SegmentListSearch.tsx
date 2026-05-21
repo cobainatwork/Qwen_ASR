@@ -1,8 +1,15 @@
 'use client';
 
+import { type RefObject } from 'react';
 import { useCorrectionStore } from '@/stores/correctionStore';
 
-export function SegmentListSearch({ speakers }: { speakers: string[] }) {
+export interface SegmentListSearchProps {
+  speakers: string[];
+  /** Forward ref to the search input for programmatic focus (e.g. Ctrl+F shortcut) */
+  inputRef?: RefObject<HTMLInputElement>;
+}
+
+export function SegmentListSearch({ speakers, inputRef }: SegmentListSearchProps) {
   const q = useCorrectionStore((s) => s.searchQuery);
   const setQ = useCorrectionStore((s) => s.setSearchQuery);
   const fs = useCorrectionStore((s) => s.filterSpeaker);
@@ -13,6 +20,7 @@ export function SegmentListSearch({ speakers }: { speakers: string[] }) {
   return (
     <div className="p-2 space-y-1 border-b text-xs">
       <input
+        ref={inputRef}
         type="search"
         aria-label="搜尋"
         placeholder="搜尋文字"

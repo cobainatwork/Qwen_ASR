@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Pause, Play } from 'lucide-react';
 
 import { useCorrectionAudio } from '@/hooks/useCorrectionAudio';
@@ -16,10 +16,18 @@ export interface CorrectionAudioPanelProps {
   onSegmentSeek?: (segmentIndex: number) => void;
 }
 
+export interface CorrectionAudioPanelHandle {
+  playToggle: () => void;
+}
+
 const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 
-export function CorrectionAudioPanel({ session, segments }: CorrectionAudioPanelProps) {
+export const CorrectionAudioPanel = forwardRef<
+  CorrectionAudioPanelHandle,
+  CorrectionAudioPanelProps
+>(function CorrectionAudioPanel({ session, segments }, ref) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const audioUrl = useMemo(() => {
     if (!session.audio_file_id) return null;
@@ -31,6 +39,18 @@ export function CorrectionAudioPanel({ session, segments }: CorrectionAudioPanel
     containerRef,
     segments,
   });
+
+  useImperativeHandle(ref, () => ({
+    playToggle: () => {
+      if (isPlaying) {
+        pause();
+        setIsPlaying(false);
+      } else {
+        play();
+        setIsPlaying(true);
+      }
+    },
+  }), [isPlaying, play, pause]);
 
   const playbackRate = useCorrectionStore((s) => s.playbackRate);
   const playbackTime = useCorrectionStore((s) => s.playbackTime);
@@ -63,7 +83,7 @@ export function CorrectionAudioPanel({ session, segments }: CorrectionAudioPanel
         <button
           type="button"
           aria-label="播放 / 暫停"
-          onClick={() => play()}
+          onClick={() => { play(); setIsPlaying(true); }}
           className="flex items-center gap-1 px-2 py-1 rounded bg-blue-500 text-white text-xs hover:bg-blue-600 focus-visible:ring-2 focus-visible:ring-blue-400"
         >
           <Play size={13} aria-hidden="true" />
@@ -73,7 +93,7 @@ export function CorrectionAudioPanel({ session, segments }: CorrectionAudioPanel
         <button
           type="button"
           aria-label="暫停"
-          onClick={() => pause()}
+          onClick={() => { pause(); setIsPlaying(false); }}
           className="flex items-center gap-1 px-2 py-1 rounded border text-xs hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-slate-400"
         >
           <Pause size={13} aria-hidden="true" />
@@ -121,4 +141,4 @@ export function CorrectionAudioPanel({ session, segments }: CorrectionAudioPanel
       </div>
     </div>
   );
-}
+});

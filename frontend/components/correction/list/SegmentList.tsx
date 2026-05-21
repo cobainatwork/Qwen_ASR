@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { type RefObject, useMemo, useRef } from 'react';
 import { useCorrectionStore } from '@/stores/correctionStore';
 import { useVirtualList } from '@/hooks/useVirtualList';
 import { SegmentListItem } from './SegmentListItem';
@@ -10,9 +10,11 @@ import type { CorrectionSegment } from '@/lib/api/correction';
 
 export interface SegmentListProps {
   segments: CorrectionSegment[];
+  /** Forwarded to SegmentListSearch input for Ctrl+F focus shortcut */
+  searchInputRef?: RefObject<HTMLInputElement>;
 }
 
-export function SegmentList({ segments }: SegmentListProps) {
+export function SegmentList({ segments, searchInputRef }: SegmentListProps) {
   const scrollRef = useRef<HTMLUListElement | null>(null);
   const q = useCorrectionStore((s) => s.searchQuery);
   const fs = useCorrectionStore((s) => s.filterSpeaker);
@@ -48,7 +50,7 @@ export function SegmentList({ segments }: SegmentListProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <SegmentListSearch speakers={speakers} />
+      <SegmentListSearch speakers={speakers} inputRef={searchInputRef} />
       <ul ref={scrollRef as React.RefObject<HTMLUListElement>} className="flex-1 overflow-y-auto">
         {!isVirtual && filtered.map((s) => <SegmentListItem key={s.id} segment={s} />)}
         {isVirtual && (

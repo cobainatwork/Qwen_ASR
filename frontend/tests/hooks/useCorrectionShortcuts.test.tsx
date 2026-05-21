@@ -1,6 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { fireEvent } from '@testing-library/react';
 import { useCorrectionShortcuts } from '@/hooks/useCorrectionShortcuts';
+import { useCorrectionStore } from '@/stores/correctionStore';
 
 const segments = [
   {
@@ -79,5 +80,29 @@ describe('useCorrectionShortcuts', () => {
     const ev = new KeyboardEvent('keydown', { code: 'Space', bubbles: true });
     window.dispatchEvent(ev);
     expect(onPlayToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('ArrowRight 切到下一段', () => {
+    const segs = [
+      { id: 1 }, { id: 2 }, { id: 3 },
+    ] as any[];
+    useCorrectionStore.getState().setFocused(1);
+    renderHook(() => useCorrectionShortcuts({
+      segments: segs, onPlayToggle: jest.fn(), onSave: jest.fn(),
+      onNextAndSave: jest.fn(), onFocusSearch: jest.fn(),
+    }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight' }));
+    expect(useCorrectionStore.getState().focusedSegmentId).toBe(2);
+  });
+
+  it('Home 跳第一段', () => {
+    const segs = [{ id: 10 }, { id: 20 }] as any[];
+    useCorrectionStore.getState().setFocused(20);
+    renderHook(() => useCorrectionShortcuts({
+      segments: segs, onPlayToggle: jest.fn(), onSave: jest.fn(),
+      onNextAndSave: jest.fn(), onFocusSearch: jest.fn(),
+    }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Home' }));
+    expect(useCorrectionStore.getState().focusedSegmentId).toBe(10);
   });
 });
