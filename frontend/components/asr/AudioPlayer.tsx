@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
 
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
+import { useThrottledValue } from '@/hooks/useThrottledValue';
 import { formatTimestamp } from '@/lib/format/time';
 import type { SpeakerTurn } from '@/lib/api/types';
 
@@ -32,9 +33,13 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, Props>(function AudioPl
 
   useImperativeHandle(ref, () => ({ seek }), [seek]);
 
+  // wavesurfer audioprocess ~60Hz → 上游推到 TranscriptViewer 後 O(N) findIndex
+  // + smooth scroll 動畫疊加在長 transcript 會卡。throttle 到 10Hz 對 highlight
+  // 精度影響不明顯但 perf 大幅改善（adversarial review IMPORTANT #2）。
+  const throttledTime = useThrottledValue(currentTime, 100);
   useEffect(() => {
-    onTimeUpdate?.(currentTime);
-  }, [currentTime, onTimeUpdate]);
+    onTimeUpdate?.(throttledTime);
+  }, [throttledTime, onTimeUpdate]);
 
   useEffect(() => {
     if (!isReady) return;

@@ -31,6 +31,12 @@ export function useAudioPlayer({ audioUrl, containerRef }: Options): ReturnShape
   useEffect(() => {
     if (!audioUrl || !containerRef.current) return;
 
+    // race guard：當 audioUrl 在前一個 load 完成前換手（使用者極快連選兩檔），
+    // cleanup 先跑 destroy 舊 ws、設 cancelled=true；新 effect 重 create + load 新 url。
+    // 若舊 ws 的 in-flight load 在 destroy 後仍觸發 ready/error，cancelled flag 阻止
+    // 它呼叫 stale setState（adversarial review IMPORTANT #1 防禦）。
+    let cancelled = false;
+
     const ws = WaveSurfer.create({
       container: containerRef.current,
       waveColor: '#94a3b8',
@@ -43,20 +49,22 @@ export function useAudioPlayer({ audioUrl, containerRef }: Options): ReturnShape
     wsRef.current = ws;
 
     ws.on('ready', () => {
+      if (cancelled) return;
       setIsReady(true);
       setDuration(ws.getDuration());
     });
-    ws.on('play', () => setIsPlaying(true));
-    ws.on('pause', () => setIsPlaying(false));
-    ws.on('finish', () => setIsPlaying(false));
-    ws.on('audioprocess', () => setCurrentTime(ws.getCurrentTime()));
-    ws.on('seeking', () => setCurrentTime(ws.getCurrentTime()));
+    ws.on('play', () => { if (!cancelled) setIsPlaying(true); });
+    ws.on('pause', () => { if (!cancelled) setIsPlaying(false); });
+    ws.on('finish', () => { if (!cancelled) setIsPlaying(false); });
+    ws.on('audioprocess', () => { if (!cancelled) setCurrentTime(ws.getCurrentTime()); });
+    ws.on('seeking', () => { if (!cancelled) setCurrentTime(ws.getCurrentTime()); });
 
     ws.load(audioUrl).catch(() => {
-      setIsReady(false);
+      if (!cancelled) setIsReady(false);
     });
 
     return () => {
+      cancelled = true;
       ws.destroy();
       wsRef.current = null;
       setIsReady(false);
