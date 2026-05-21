@@ -1,3 +1,7 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useContext, useMemo } from 'react';
+
+import { AuthContext } from '@/components/auth/AuthProvider';
 import type { ResponseEnvelope } from './types';
 
 const DEFAULT_TIMEOUT_MS = 1_200_000; // 對齊 M6 client.ts ASR_REQUEST_TIMEOUT_SEC
@@ -155,4 +159,59 @@ export class CorrectionApi {
       clearTimeout(timer);
     }
   }
+}
+
+// ─── TanStack Query hooks（A3 主用） ──────────────────────────────────────────
+
+/**
+ * GET /api/v1/correction/sessions/{sessionId}
+ * 取得校正工作階段詳情
+ */
+export function useCorrectionSessionQuery(sessionId: number) {
+  const { token } = useContext(AuthContext);
+  const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
+  return useQuery({
+    queryKey: ['correction', 'session', sessionId],
+    queryFn: () => api.getSession(sessionId),
+    enabled: token != null && Number.isFinite(sessionId),
+  });
+}
+
+/**
+ * GET /api/v1/correction/sessions/{sessionId}/segments
+ * 列出工作階段所有校正片段
+ */
+export function useCorrectionSegmentsQuery(sessionId: number) {
+  const { token } = useContext(AuthContext);
+  const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
+  return useQuery({
+    queryKey: ['correction', 'segments', sessionId],
+    queryFn: () => api.listSegments(sessionId),
+    enabled: token != null && Number.isFinite(sessionId),
+  });
+}
+
+/**
+ * PUT /api/v1/correction/sessions/{sessionId}/segments/{segmentId}
+ * 更新單一校正片段（含 optimistic locking），成功後自動 invalidate segments 快取
+ */
+export function useUpdateSegmentMutation(sessionId: number) {
+  const { token } = useContext(AuthContext);
+  const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      segmentId: number;
+      corrected_text: string | null;
+      expected_version: number;
+      is_skipped?: boolean;
+    }) =>
+      api.updateSegment(sessionId, vars.segmentId, {
+        corrected_text: vars.corrected_text ?? '',
+        expected_version: vars.expected_version,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['correction', 'segments', sessionId] });
+    },
+  });
 }
