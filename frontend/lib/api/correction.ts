@@ -25,6 +25,8 @@ export interface CorrectionSegment {
   end_sec: number;
   original_text: string;
   corrected_text: string | null;
+  speaker_label: string | null;
+  is_skipped: boolean;
   version: number;
   updated_at: string;
 }

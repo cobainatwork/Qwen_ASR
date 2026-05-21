@@ -11,6 +11,7 @@ const config: Config = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
     '^wavesurfer\\.js$': '<rootDir>/__mocks__/wavesurfer.js.ts',
+    '^wavesurfer\\.js/dist/plugins/regions$': '<rootDir>/__mocks__/wavesurfer.js/dist/plugins/regions.ts',
     '^@wavesurfer/react$': '<rootDir>/__mocks__/@wavesurfer/react.tsx',
     '^idb-keyval$': '<rootDir>/__mocks__/idb-keyval.ts',
   },
