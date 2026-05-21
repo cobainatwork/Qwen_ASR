@@ -18,14 +18,28 @@ def postgres_url() -> Generator[str, None, None]:
 
 @pytest.fixture(scope="session")
 def db_engine(postgres_url: str) -> Generator[Engine, None, None]:
-    """初始化 schema：直接 alembic upgrade head。"""
+    """初始化 schema：直接 alembic upgrade head。
+
+    env.py 讀取 DATABASE_URL 環境變數並覆寫 cfg.set_main_option，導致
+    testcontainers DB URL 被生產 DB URL 取代。修正方式：暫時 unset
+    DATABASE_URL，確保 alembic 使用 cfg 中設定的 testcontainers URL。
+    """
     from alembic import command
     from alembic.config import Config
 
     engine = create_engine(postgres_url, future=True)
     cfg = Config("alembic.ini")
     cfg.set_main_option("sqlalchemy.url", postgres_url)
-    command.upgrade(cfg, "head")
+
+    # Temporarily remove DATABASE_URL so alembic/env.py does not override the
+    # testcontainers URL with the production database URL.
+    saved_db_url = os.environ.pop("DATABASE_URL", None)
+    try:
+        command.upgrade(cfg, "head")
+    finally:
+        if saved_db_url is not None:
+            os.environ["DATABASE_URL"] = saved_db_url
+
     yield engine
     engine.dispose()
 
