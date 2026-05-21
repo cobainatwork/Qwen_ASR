@@ -1,3 +1,5 @@
+from typing import Any
+
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -25,8 +27,28 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_exc(request: Request, exc: RequestValidationError) -> JSONResponse:
-        v = ValidationFailedError(details={"errors": exc.errors()})
-        logger.warning("Validation error", path=request.url.path, errors=exc.errors())
+        def _sanitize(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            """Convert non-JSON-serializable values in pydantic error dicts to strings.
+
+            Pydantic v2 model_validator(mode='after') errors include a 'ctx' key
+            whose 'error' value is the raw Exception instance, which is not
+            JSON-serializable.  Stringify it so JSONResponse does not crash.
+            """
+            result = []
+            for err in errors:
+                sanitized = dict(err)
+                if "ctx" in sanitized:
+                    ctx = sanitized["ctx"]
+                    sanitized["ctx"] = {
+                        k: str(v) if isinstance(v, Exception) else v
+                        for k, v in ctx.items()
+                    }
+                result.append(sanitized)
+            return result
+
+        sanitized_errors = _sanitize(list(exc.errors()))
+        v = ValidationFailedError(details={"errors": sanitized_errors})
+        logger.warning("Validation error", path=request.url.path, errors=sanitized_errors)
         return JSONResponse(
             status_code=v.http_status,
             content=failure(v.code, v.message, v.details).model_dump(),
