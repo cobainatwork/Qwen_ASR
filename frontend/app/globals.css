@@ -69,6 +69,21 @@ html, body {
   backdrop-filter: blur(8px);
 }
 
+.correction-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.correction-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+.correction-audio { width: 320px; flex-shrink: 0; border-right: 1px solid rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+.correction-list { width: 280px; flex-shrink: 0; border-right: 1px solid rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+.correction-editor { flex: 1; overflow-y: auto; padding: 16px; }
+
 /* 自訂捲軸（spec §4.3 light-theme 翻譯） */
 ::-webkit-scrollbar {
   width: 8px;
