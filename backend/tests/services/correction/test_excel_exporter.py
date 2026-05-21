@@ -139,7 +139,7 @@ def test_session_to_excel_columns_and_rows(excel_setup) -> None:
     assert rows[0] == ("段落", "開始", "結束", "語者", "原文", "校正", "已跳過")
     # 共 3 段 + 1 表頭
     assert len(rows) == 1 + 3
-    # 第 2 段 speaker_label NULL → 空字串
-    assert rows[2][3] == ""
+    # 第 2 段 speaker_label NULL → 空字串（openpyxl values_only=True 回傳空儲存格為 None）
+    assert rows[2][3] in (None, "")
     # 第 3 段 is_skipped = True
     assert rows[3][6] is True
