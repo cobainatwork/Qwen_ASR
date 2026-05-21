@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class CorrectionSessionData(BaseModel):
@@ -30,6 +30,14 @@ class CorrectionSegmentUpdate(BaseModel):
     corrected_text: str | None = Field(None, min_length=0, max_length=5000)
     is_skipped: bool | None = None  # None 表示不變更
     expected_version: int
+
+    @model_validator(mode="after")
+    def _at_least_one_field(self) -> "CorrectionSegmentUpdate":
+        if self.corrected_text is None and self.is_skipped is None:
+            raise ValueError(
+                "至少需提供 corrected_text 或 is_skipped 其一"
+            )
+        return self
 
 
 class ExportToDatasetRequest(BaseModel):

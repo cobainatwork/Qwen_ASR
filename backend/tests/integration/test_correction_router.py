@@ -182,6 +182,51 @@ def test_update_segment_version_mismatch(corr_app, db_session: Session) -> None:
     assert row.corrected_text == "first"  # 第二次 stale request 未覆寫
 
 
+def test_update_segment_rejects_empty_update(corr_app, db_session: Session) -> None:
+    """Both corrected_text and is_skipped omitted: Pydantic must reject with 422."""
+    app, token, session_id, _ = corr_app
+    seg_id = int(db_session.execute(text(
+        "SELECT id FROM correction_segments WHERE session_id = :s ORDER BY segment_index LIMIT 1"
+    ), {"s": session_id}).scalar_one())
+
+    with TestClient(app) as client:
+        resp = client.put(
+            f"/api/v1/correction/sessions/{session_id}/segments/{seg_id}",
+            json={"expected_version": 1},
+            headers=_headers(token),
+        )
+    assert resp.status_code == 422
+    detail_text = str(resp.json())
+    assert "至少需提供" in detail_text or "corrected_text" in detail_text
+
+    # 版本號必須未被消耗
+    db_session.expire_all()
+    row = db_session.execute(
+        text("SELECT version FROM correction_segments WHERE id = :id"),
+        {"id": seg_id},
+    ).one()
+    assert row.version == 1
+
+
+def test_update_segment_is_skipped_only(corr_app, db_session: Session) -> None:
+    """is_skipped only (corrected_text=None) must be accepted."""
+    app, token, session_id, _ = corr_app
+    seg_id = int(db_session.execute(text(
+        "SELECT id FROM correction_segments WHERE session_id = :s ORDER BY segment_index LIMIT 1"
+    ), {"s": session_id}).scalar_one())
+
+    with TestClient(app) as client:
+        resp = client.put(
+            f"/api/v1/correction/sessions/{session_id}/segments/{seg_id}",
+            json={"is_skipped": True, "expected_version": 1},
+            headers=_headers(token),
+        )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["is_skipped"] is True
+    assert data["version"] == 2
+
+
 def test_get_session_not_found(corr_app) -> None:
     app, token, _, _ = corr_app
     with TestClient(app) as client:
