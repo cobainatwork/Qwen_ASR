@@ -132,7 +132,72 @@ export class CorrectionApi {
     );
   }
 
+  /**
+   * 匯出校正工作階段為 JSONL 格式
+   * POST /api/v1/correction/sessions/{session_id}/export-jsonl
+   */
+  async exportJsonl(sessionId: number): Promise<Blob> {
+    return this.requestBlob(
+      `/api/v1/correction/sessions/${sessionId}/export-jsonl`,
+    );
+  }
+
+  /**
+   * 匯出校正工作階段為 Excel 格式
+   * POST /api/v1/correction/sessions/{session_id}/export-excel
+   */
+  async exportExcel(sessionId: number): Promise<Blob> {
+    return this.requestBlob(
+      `/api/v1/correction/sessions/${sessionId}/export-excel`,
+    );
+  }
+
+  /**
+   * 評估工作階段品質
+   * POST /api/v1/correction/sessions/{session_id}/evaluate-quality
+   */
+  async evaluateQuality(
+    sessionId: number,
+  ): Promise<{ score: number; issues: { code: string; message?: string }[] }> {
+    return this.request<{
+      score: number;
+      issues: { code: string; message?: string }[];
+    }>(`/api/v1/correction/sessions/${sessionId}/evaluate-quality`, {
+      method: 'POST',
+    });
+  }
+
   // ─── 私有工具 ──────────────────────────────────────────────────────────────
+
+  /** Blob 專用請求（跳過 JSON envelope 解析）。 */
+  private async requestBlob(path: string): Promise<Blob> {
+    const token = this.getToken();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+    try {
+      const resp = await fetch(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!resp.ok) {
+        // Best-effort：嘗試解析 JSON envelope 取得錯誤碼
+        let code = 'EXPORT_FAILED';
+        let message = `匯出失敗（HTTP ${resp.status}）`;
+        try {
+          const json = await resp.json();
+          code = json?.error?.code ?? code;
+          message = json?.error?.message ?? message;
+        } catch {
+          // ignore parse error
+        }
+        throw new CorrectionApiError(code, message, resp.status);
+      }
+      return resp.blob();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   private async request<T>(path: string, init: RequestInit): Promise<T> {
     const token = this.getToken();
@@ -216,5 +281,41 @@ export function useUpdateSegmentMutation(sessionId: number) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['correction', 'segments', sessionId] });
     },
+  });
+}
+
+/**
+ * POST /api/v1/correction/sessions/{sessionId}/export-jsonl
+ * 匯出 JSONL Blob
+ */
+export function useExportJsonlMutation(sessionId: number) {
+  const { token } = useContext(AuthContext);
+  const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
+  return useMutation({
+    mutationFn: () => api.exportJsonl(sessionId),
+  });
+}
+
+/**
+ * POST /api/v1/correction/sessions/{sessionId}/export-excel
+ * 匯出 Excel Blob
+ */
+export function useExportExcelMutation(sessionId: number) {
+  const { token } = useContext(AuthContext);
+  const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
+  return useMutation({
+    mutationFn: () => api.exportExcel(sessionId),
+  });
+}
+
+/**
+ * POST /api/v1/correction/sessions/{sessionId}/evaluate-quality
+ * 品質評估
+ */
+export function useEvaluateQualityMutation(sessionId: number) {
+  const { token } = useContext(AuthContext);
+  const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
+  return useMutation({
+    mutationFn: () => api.evaluateQuality(sessionId),
   });
 }
