@@ -5,13 +5,15 @@
 """
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from app.repositories.correction import CorrectionSegmentRepository, CorrectionSessionRepository
 from app.services.dataset.quality import evaluate_text_quality
 
 
-def evaluate_session_quality(db: Session, session_id: int, api_key_id: int) -> dict:  # type: ignore[type-arg]
+def evaluate_session_quality(db: Session, session_id: int, api_key_id: int) -> dict[str, Any]:
     """評估 session 的校正品質。
 
     回傳格式：{"score": float, "issues": list[{"code": str, "message": str | None}]}

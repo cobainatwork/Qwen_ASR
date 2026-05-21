@@ -7,8 +7,10 @@ This stub satisfies the contract expected by quality_evaluator.py:
 """
 from __future__ import annotations
 
+from typing import Any
 
-def evaluate_text_quality(texts: list[str]) -> dict:  # type: ignore[type-arg]
+
+def evaluate_text_quality(texts: list[str]) -> dict[str, Any]:
     """評估文字品質（stub 實作）。
 
     Phase A4 補強：接入真實 KenLM / NEC 評分管線。

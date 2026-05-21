@@ -25,9 +25,11 @@ def session_to_jsonl(db: Session, session_id: int, api_key_id: int) -> str:
         return ""
 
     # 取 transcription → audio_file_id（供訓練資料對應音檔）
+    # Cross-tenant guard: transcription must belong to the same api_key_id
+    # (mirrors the check in exporter.py:42 for export_session_to_dataset).
     transcription = db.get(Transcription, sess.transcription_id)
     audio_file_id: int | None = None
-    if transcription is not None:
+    if transcription is not None and transcription.api_key_id == api_key_id:
         audio = db.execute(
             select(AudioFile).where(AudioFile.transcription_id == transcription.id)
         ).scalar_one_or_none()
