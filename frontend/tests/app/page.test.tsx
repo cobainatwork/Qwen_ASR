@@ -98,3 +98,43 @@ describe('HomePage rehydrate banner', () => {
     expect(screen.queryByText(/此為先前紀錄/)).not.toBeInTheDocument();
   });
 });
+
+// ─── Mock next/navigation and useCreateCorrectionSessionMutation ──────────────
+
+const mockPush = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
+const mockMutateAsync = jest.fn();
+jest.mock('@/lib/api/correction', () => ({
+  useCreateCorrectionSessionMutation: () => ({
+    mutateAsync: mockMutateAsync,
+    isPending: false,
+  }),
+}));
+
+describe('HomePage — 進入校正工作台 button', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    mockPush.mockReset();
+    mockMutateAsync.mockReset();
+  });
+
+  test('button is rendered after a transcribe result is set', async () => {
+    render(<HomePage />);
+    await userEvent.click(screen.getByRole('button', { name: 'mock-result' }));
+    expect(screen.getByRole('button', { name: /進入校正工作台/ })).toBeInTheDocument();
+  });
+
+  test('clicking button calls createSession mutation and pushes to /correction/{id}', async () => {
+    mockMutateAsync.mockResolvedValueOnce({ id: 42, transcription_id: 99 });
+    render(<HomePage />);
+    await userEvent.click(screen.getByRole('button', { name: 'mock-result' }));
+
+    await userEvent.click(screen.getByRole('button', { name: /進入校正工作台/ }));
+
+    expect(mockMutateAsync).toHaveBeenCalledWith({ transcription_id: 99 });
+    expect(mockPush).toHaveBeenCalledWith('/correction/42');
+  });
+});

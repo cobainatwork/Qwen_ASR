@@ -108,6 +108,56 @@ describe('CorrectionApi.updateSegment', () => {
   });
 });
 
+describe('CorrectionApi.createSession', () => {
+  let api: CorrectionApi;
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    api = new CorrectionApi({ getToken: () => 'test-token' });
+  });
+
+  it('POST /sessions with transcription_id, returns session', async () => {
+    const mockSession = {
+      id: 10,
+      transcription_id: 5,
+      audio_file_id: null,
+      name: '測試轉錄 #5',
+      status: 'in_progress',
+      created_at: '2026-05-22T00:00:00Z',
+      updated_at: '2026-05-22T00:00:00Z',
+    };
+    mockFetch.mockResolvedValueOnce(makeMockResponse(mockSession));
+
+    const result = await api.createSession({ transcription_id: 5 });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/correction/sessions',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const callArgs = mockFetch.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(callArgs.body as string);
+    expect(body).toEqual({ transcription_id: 5 });
+    expect(result.id).toBe(10);
+    expect(result.transcription_id).toBe(5);
+  });
+
+  it('propagates CorrectionApiError on failure', async () => {
+    mockFetch.mockResolvedValueOnce({
+      status: 404,
+      json: async () => ({
+        success: false,
+        data: null,
+        error: { code: 'TRANSCRIPTION_NOT_FOUND', message: '轉錄紀錄不存在' },
+      }),
+    } as unknown as Response);
+
+    await expect(api.createSession({ transcription_id: 99999 })).rejects.toMatchObject({
+      code: 'TRANSCRIPTION_NOT_FOUND',
+      status: 404,
+    });
+  });
+});
+
 describe('CorrectionApi.getSession', () => {
   let api: CorrectionApi;
 

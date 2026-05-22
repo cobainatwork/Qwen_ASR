@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { AudioUploader } from '@/components/asr/AudioUploader';
 import { TranscriptionResult } from '@/components/asr/TranscriptionResult';
 import { AudioPlayer, type AudioPlayerHandle } from '@/components/asr/AudioPlayer';
 import { TranscriptViewer } from '@/components/asr/TranscriptViewer';
 import { ExportButtons } from '@/components/asr/ExportButtons';
+import { useCreateCorrectionSessionMutation } from '@/lib/api/correction';
 import type { TranscribeData } from '@/lib/api/types';
 
 const STORAGE_KEY = 'qwen-asr:last-transcribe-result';
@@ -19,6 +21,8 @@ export default function Page() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const playerRef = useRef<AudioPlayerHandle | null>(null);
+  const router = useRouter();
+  const createSessionM = useCreateCorrectionSessionMutation();
 
   const audioUrl = useMemo(() => {
     if (!audioFile) return null;
@@ -133,7 +137,22 @@ export default function Page() {
         {stored ? (
           <>
             <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-foreground/10 sticky top-0 bg-white/80 backdrop-blur-sm z-10">
-              <ExportButtons data={stored.data} baseFilename={`transcription-${stored.data.transcription_id}`} />
+              <div className="flex items-center gap-2">
+                <ExportButtons data={stored.data} baseFilename={`transcription-${stored.data.transcription_id}`} />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const sess = await createSessionM.mutateAsync({
+                      transcription_id: stored.data.transcription_id,
+                    });
+                    router.push(`/correction/${sess.id}`);
+                  }}
+                  disabled={createSessionM.isPending}
+                  className="rounded-lg border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs text-accent hover:bg-accent/20 disabled:opacity-50 transition-colors"
+                >
+                  {createSessionM.isPending ? '建立中...' : '進入校正工作台'}
+                </button>
+              </div>
               <span className="text-xs text-foreground/60 font-mono tabular-nums">
                 {stored.data.duration_sec.toFixed(1)}s · {stored.data.vad_segments_count} VAD · {stored.data.model_version}
               </span>

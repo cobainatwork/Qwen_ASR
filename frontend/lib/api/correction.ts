@@ -49,6 +49,11 @@ export interface CorrectionSessionListData {
   pagination: PaginationMeta;
 }
 
+export interface CreateCorrectionSessionPayload {
+  transcription_id: number;
+  name?: string;
+}
+
 export interface ExportToDatasetPayload {
   dataset_id: number;
 }
@@ -176,6 +181,18 @@ export class CorrectionApi {
     return this.requestBlob(
       `/api/v1/correction/sessions/${sessionId}/export-excel`,
     );
+  }
+
+  /**
+   * 從現有 transcription 建立 correction session（idempotent）
+   * POST /api/v1/correction/sessions
+   */
+  async createSession(payload: CreateCorrectionSessionPayload): Promise<CorrectionSession> {
+    return this.request<CorrectionSession>('/api/v1/correction/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
   }
 
   /**
@@ -360,5 +377,21 @@ export function useEvaluateQualityMutation(sessionId: number) {
   const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
   return useMutation({
     mutationFn: () => api.evaluateQuality(sessionId),
+  });
+}
+
+/**
+ * POST /api/v1/correction/sessions
+ * 從 transcription 建立（或取回既有）correction session，成功後 invalidate sessions list
+ */
+export function useCreateCorrectionSessionMutation() {
+  const { token } = useContext(AuthContext);
+  const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateCorrectionSessionPayload) => api.createSession(payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['correction', 'sessions-list'] });
+    },
   });
 }
