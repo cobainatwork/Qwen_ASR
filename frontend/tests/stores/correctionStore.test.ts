@@ -36,4 +36,27 @@ describe('correctionStore', () => {
     expect(useCorrectionStore.getState().loopRange).toBeNull();
     expect(useCorrectionStore.getState().loopMode).toBe('segment');
   });
+
+  it('reset 還原 state 但不 wipe action functions（regression：StrictMode 雙 mount cleanup）', () => {
+    const initial = useCorrectionStore.getState();
+    initial.setSession(42);
+    initial.setFocused(7);
+    initial.setDraft(1, 'hi', 1);
+    expect(useCorrectionStore.getState().sessionId).toBe(42);
+
+    useCorrectionStore.getState().reset();
+
+    // state 還原
+    const after = useCorrectionStore.getState();
+    expect(after.sessionId).toBeNull();
+    expect(after.focusedSegmentId).toBeNull();
+    expect(after.draftMap.size).toBe(0);
+
+    // actions 仍可呼叫（這是先前 bug：setSession is not a function after reset）
+    expect(typeof after.setSession).toBe('function');
+    expect(typeof after.setFocused).toBe('function');
+    expect(typeof after.reset).toBe('function');
+    after.setSession(99);
+    expect(useCorrectionStore.getState().sessionId).toBe(99);
+  });
 });

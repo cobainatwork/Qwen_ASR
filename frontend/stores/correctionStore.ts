@@ -90,8 +90,12 @@ export const useCorrectionStore = create<CorrectionState & CorrectionActions>(
     setFilterSpeaker: (s) => set({ filterSpeaker: s }),
     setFilterStatus: (s) => set({ filterStatus: s }),
 
-    reset: () =>
-      set(INITIAL_STATE as CorrectionState & CorrectionActions, true),
+    // Partial set (not `, true` full-replace) preserves action functions on
+    // the store. Using full-replace with INITIAL_STATE wipes all actions —
+    // and the next caller hits `setSession is not a function`. React.StrictMode
+    // in dev double-mounts useEffect, so a buggy reset() on cleanup blows up
+    // the second mount.
+    reset: () => set({ ...INITIAL_STATE }),
   }),
 );
 
