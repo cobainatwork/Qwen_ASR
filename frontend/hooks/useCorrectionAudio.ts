@@ -20,6 +20,8 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
   const blobUrlRef = useRef<string | null>(null);
   // Expose isPlaying from wavesurfer events — avoids stale local state in the panel.
   const [isPlaying, setIsPlaying] = useState(false);
+  // Throttle audioprocess setTime logging to avoid console spam (every 5th call).
+  const setTimeCallCountRef = useRef(0);
 
   useEffect(() => {
     if (!audioUrl || !containerRef.current || !token) return;
@@ -40,11 +42,24 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
     regionsRef.current = regions;
 
     // Sync isPlaying from wavesurfer's authoritative play state.
-    ws.on('play', () => { if (!cancelled) setIsPlaying(true); });
-    ws.on('pause', () => { if (!cancelled) setIsPlaying(false); });
-    ws.on('finish', () => { if (!cancelled) setIsPlaying(false); });
+    ws.on('play', () => {
+      console.log('[CorrAudio] event:play', { t: ws.getCurrentTime() });
+      if (!cancelled) setIsPlaying(true);
+    });
+    ws.on('pause', () => {
+      console.log('[CorrAudio] event:pause', { t: ws.getCurrentTime() });
+      if (!cancelled) setIsPlaying(false);
+    });
+    ws.on('finish', () => {
+      console.log('[CorrAudio] event:finish');
+      if (!cancelled) setIsPlaying(false);
+    });
+    ws.on('error', (err) => {
+      console.error('[CorrAudio] event:error', err);
+    });
 
     ws.on('ready', () => {
+      console.log('[CorrAudio] event:ready', { duration: ws.getDuration() });
       if (cancelled) return;
       segments.forEach((seg, idx) => {
         regions.addRegion({
@@ -67,10 +82,31 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
 
       const { loopMode, loopRange, focusedSegmentId } = useCorrectionStore.getState();
       if (loopMode === 'range' && loopRange) {
-        if (t >= loopRange.end) ws.setTime(loopRange.start);
+        if (t >= loopRange.end) {
+          setTimeCallCountRef.current += 1;
+          if (setTimeCallCountRef.current % 5 === 1) {
+            console.log('[CorrAudio] segment loop seek (range)', {
+              callCount: setTimeCallCountRef.current,
+              from: t.toFixed(3),
+              to: loopRange.start.toFixed(3),
+            });
+          }
+          ws.setTime(loopRange.start);
+        }
       } else if (loopMode === 'segment' && focusedSegmentId != null) {
         const seg = segments.find((s) => s.id === focusedSegmentId);
-        if (seg && t >= seg.end_sec) ws.setTime(seg.start_sec);
+        if (seg && t >= seg.end_sec) {
+          setTimeCallCountRef.current += 1;
+          if (setTimeCallCountRef.current % 5 === 1) {
+            console.log('[CorrAudio] segment loop seek (segment)', {
+              callCount: setTimeCallCountRef.current,
+              from: t.toFixed(3),
+              to: seg.start_sec.toFixed(3),
+              segId: seg.id,
+            });
+          }
+          ws.setTime(seg.start_sec);
+        }
       }
     });
 
@@ -83,15 +119,22 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
         const r = await fetch(audioUrl, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        console.log('[CorrAudio] fetch result', {
+          status: r.status,
+          contentType: r.headers.get('content-type'),
+          contentLength: r.headers.get('content-length'),
+        });
         if (!r.ok) throw new Error(`audio fetch failed: ${r.status}`);
         const blob = await r.blob();
+        console.log('[CorrAudio] blob created', { size: blob.size, type: blob.type });
         if (cancelled) return;
         const blobUrl = URL.createObjectURL(blob);
         blobUrlRef.current = blobUrl;
         await ws.load(blobUrl);
+        console.log('[CorrAudio] ws.load completed');
       } catch (e) {
         if (!cancelled) {
-          console.error('useCorrectionAudio: load failed', e);
+          console.error('[CorrAudio] load failed', e);
           wsRef.current = null;
         }
       }
@@ -116,15 +159,28 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
   // function refs, which would re-trigger useEffect deps in the consuming
   // component and call ws.setTime() every frame — sticking playback at the
   // segment start.
-  const play = useCallback(() => { wsRef.current?.play(); }, []);
-  const pause = useCallback(() => { wsRef.current?.pause(); }, []);
-  const seek = useCallback((t: number) => { wsRef.current?.setTime(t); }, []);
-  const setRate = useCallback((r: number) => { wsRef.current?.setPlaybackRate(r, true); }, []);
+  const play = useCallback(() => {
+    console.log('[CorrAudio] cmd:play');
+    wsRef.current?.play();
+  }, []);
+  const pause = useCallback(() => {
+    console.log('[CorrAudio] cmd:pause');
+    wsRef.current?.pause();
+  }, []);
+  const seek = useCallback((t: number) => {
+    console.log('[CorrAudio] cmd:seek', { t: t.toFixed(3) });
+    wsRef.current?.setTime(t);
+  }, []);
+  const setRate = useCallback((r: number) => {
+    console.log('[CorrAudio] cmd:setRate', { r });
+    wsRef.current?.setPlaybackRate(r, true);
+  }, []);
 
   // seekToSegment: seek only — no zoom(). Zoom was disrupting the canvas mid-
   // playback when this was triggered automatically on every segment focus change.
   // Zoom can be re-added as a manual button if desired.
   const seekToSegment = useCallback((seg: CorrectionSegment) => {
+    console.log('[CorrAudio] cmd:seekToSegment', { id: seg.id, start: seg.start_sec.toFixed(3), end: seg.end_sec.toFixed(3) });
     wsRef.current?.setTime(seg.start_sec);
   }, []);
 
