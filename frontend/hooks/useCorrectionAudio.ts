@@ -1,23 +1,26 @@
 'use client';
 
-import { useEffect, useRef, type RefObject } from 'react';
+import { useContext, useEffect, useRef, type RefObject } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions';
+import { AuthContext } from '@/components/auth/AuthProvider';
 import { useCorrectionStore } from '@/stores/correctionStore';
 import type { CorrectionSegment } from '@/lib/api/correction';
 
 interface Options {
-  audioUrl: string | null;
+  audioUrl: string | null;   // e.g. "/api/v1/audio/{id}/stream"
   containerRef: RefObject<HTMLDivElement | null>;
   segments: CorrectionSegment[];
 }
 
 export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options) {
+  const { token } = useContext(AuthContext);
   const wsRef = useRef<WaveSurfer | null>(null);
   const regionsRef = useRef<ReturnType<typeof RegionsPlugin.create> | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!audioUrl || !containerRef.current) return;
+    if (!audioUrl || !containerRef.current || !token) return;
     let cancelled = false;
 
     const regions = RegionsPlugin.create();
@@ -64,17 +67,40 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
       }
     });
 
-    ws.load(audioUrl).catch(() => {
-      if (!cancelled) wsRef.current = null;
-    });
+    // Browser <audio> elements cannot attach custom HTTP headers, so
+    // ws.load(url) directly would hit 401 on the Bearer-auth endpoint.
+    // Fix: fetch the audio with Authorization header, create an object URL
+    // from the blob, then feed that to wavesurfer.
+    (async () => {
+      try {
+        const r = await fetch(audioUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) throw new Error(`audio fetch failed: ${r.status}`);
+        const blob = await r.blob();
+        if (cancelled) return;
+        const blobUrl = URL.createObjectURL(blob);
+        blobUrlRef.current = blobUrl;
+        await ws.load(blobUrl);
+      } catch (e) {
+        if (!cancelled) {
+          console.error('useCorrectionAudio: load failed', e);
+          wsRef.current = null;
+        }
+      }
+    })();
 
     return () => {
       cancelled = true;
       ws.destroy();
       wsRef.current = null;
       regionsRef.current = null;
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
     };
-  }, [audioUrl, containerRef, segments]);
+  }, [audioUrl, containerRef, segments, token]);
 
   return {
     play: () => wsRef.current?.play(),
