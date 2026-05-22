@@ -17,7 +17,7 @@ class AudioFile(Base, TenantMixin):
     mime_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     verified_mime_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     transcription_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("transcriptions.id"), nullable=True, index=True
+        Integer, ForeignKey("transcriptions.id", ondelete="SET NULL"), nullable=True, index=True
     )
     original_sample_rate: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

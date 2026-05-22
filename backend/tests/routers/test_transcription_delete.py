@@ -68,14 +68,15 @@ def _insert_api_key(
     )
 
 
-def _insert_audio_file(db: Session, api_key_id: int) -> int:
+def _insert_audio_file(db: Session, api_key_id: int, transcription_id: int | None = None) -> int:
     db.execute(
         text(
             "INSERT INTO audio_files "
-            "(api_key_id, storage_path, original_name, mime_type, file_size, sha256) "
-            "VALUES (:a, 'uploads/dummy.wav', 'dummy.wav', 'audio/wav', 1024, 'abc123')"
+            "(api_key_id, storage_path, original_name, mime_type, "
+            "file_size, sha256, transcription_id) "
+            "VALUES (:a, 'uploads/dummy.wav', 'dummy.wav', 'audio/wav', 1024, 'abc123', :tx)"
         ),
-        {"a": api_key_id},
+        {"a": api_key_id, "tx": transcription_id},
     )
     return int(
         db.execute(
@@ -291,12 +292,26 @@ def test_delete_transcription_scope_reject(base_setup, db_session: Session) -> N
 
 
 def test_delete_transcription_audio_file_preserved(base_setup, db_session: Session) -> None:
-    """DELETE transcription → audio_file row still exists in DB (not in cascade chain)."""
+    """DELETE transcription → audio_file row still exists; transcription_id SET NULL."""
     client, _, api_key_id, write_token = base_setup
 
-    audio_file_id = _insert_audio_file(db_session, api_key_id)
+    # Insert audio_file without transcription_id first, then insert transcription,
+    # then back-link audio_file.transcription_id to exercise the ON DELETE SET NULL path.
+    audio_file_id = _insert_audio_file(db_session, api_key_id, transcription_id=None)
     tx_id = _insert_transcription(db_session, api_key_id, audio_file_id=audio_file_id)
+    # Link audio_file → transcription (this is the FK that was missing SET NULL)
+    db_session.execute(
+        text("UPDATE audio_files SET transcription_id = :tx WHERE id = :af"),
+        {"tx": tx_id, "af": audio_file_id},
+    )
     db_session.flush()
+
+    # Confirm link is in place before delete
+    tx_id_before = db_session.execute(
+        text("SELECT transcription_id FROM audio_files WHERE id = :af"),
+        {"af": audio_file_id},
+    ).scalar_one_or_none()
+    assert tx_id_before == tx_id
 
     r = client.delete(
         f"/api/v1/asr/transcriptions/{tx_id}",
@@ -304,9 +319,16 @@ def test_delete_transcription_audio_file_preserved(base_setup, db_session: Sessi
     )
     assert r.status_code == 204
 
-    # audio_file must still exist
+    # audio_file row must still exist (not cascade-deleted)
     af_row = db_session.execute(
-        text("SELECT id FROM audio_files WHERE id = :af_id"),
+        text("SELECT id, transcription_id FROM audio_files WHERE id = :af_id"),
         {"af_id": audio_file_id},
     ).scalar_one_or_none()
     assert af_row is not None
+
+    # transcription_id must be NULL (ON DELETE SET NULL applied)
+    tx_id_after = db_session.execute(
+        text("SELECT transcription_id FROM audio_files WHERE id = :af"),
+        {"af": audio_file_id},
+    ).scalar_one_or_none()
+    assert tx_id_after is None
