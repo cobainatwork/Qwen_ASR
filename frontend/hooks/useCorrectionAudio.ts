@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useEffect, useRef, type RefObject } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type RefObject } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions';
 import { AuthContext } from '@/components/auth/AuthProvider';
@@ -18,6 +18,8 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
   const wsRef = useRef<WaveSurfer | null>(null);
   const regionsRef = useRef<ReturnType<typeof RegionsPlugin.create> | null>(null);
   const blobUrlRef = useRef<string | null>(null);
+  // Expose isPlaying from wavesurfer events — avoids stale local state in the panel.
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     if (!audioUrl || !containerRef.current || !token) return;
@@ -36,6 +38,11 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
     });
     wsRef.current = ws;
     regionsRef.current = regions;
+
+    // Sync isPlaying from wavesurfer's authoritative play state.
+    ws.on('play', () => { if (!cancelled) setIsPlaying(true); });
+    ws.on('pause', () => { if (!cancelled) setIsPlaying(false); });
+    ws.on('finish', () => { if (!cancelled) setIsPlaying(false); });
 
     ws.on('ready', () => {
       if (cancelled) return;
@@ -95,6 +102,7 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
       ws.destroy();
       wsRef.current = null;
       regionsRef.current = null;
+      setIsPlaying(false);
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
@@ -102,19 +110,23 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
     };
   }, [audioUrl, containerRef, segments, token]);
 
-  return {
-    play: () => wsRef.current?.play(),
-    pause: () => wsRef.current?.pause(),
-    seek: (t: number) => wsRef.current?.setTime(t),
-    setRate: (r: number) => wsRef.current?.setPlaybackRate(r, true),
-    zoomToSegment: (seg: CorrectionSegment) => {
-      if (!wsRef.current) return;
-      const duration = wsRef.current.getDuration();
-      if (duration > 0) {
-        const ratio = (seg.end_sec - seg.start_sec) / duration;
-        wsRef.current.zoom(Math.min(200, Math.max(50, 100 / ratio)));
-      }
-      wsRef.current.setTime(seg.start_sec);
-    },
-  };
+  // All returned functions are wrapped in useCallback so their references remain
+  // stable across renders. Without this, any Zustand subscriber that causes a
+  // re-render (e.g. playbackTime updates via audioprocess) would produce new
+  // function refs, which would re-trigger useEffect deps in the consuming
+  // component and call ws.setTime() every frame — sticking playback at the
+  // segment start.
+  const play = useCallback(() => { wsRef.current?.play(); }, []);
+  const pause = useCallback(() => { wsRef.current?.pause(); }, []);
+  const seek = useCallback((t: number) => { wsRef.current?.setTime(t); }, []);
+  const setRate = useCallback((r: number) => { wsRef.current?.setPlaybackRate(r, true); }, []);
+
+  // seekToSegment: seek only — no zoom(). Zoom was disrupting the canvas mid-
+  // playback when this was triggered automatically on every segment focus change.
+  // Zoom can be re-added as a manual button if desired.
+  const seekToSegment = useCallback((seg: CorrectionSegment) => {
+    wsRef.current?.setTime(seg.start_sec);
+  }, []);
+
+  return { play, pause, seek, setRate, seekToSegment, isPlaying };
 }

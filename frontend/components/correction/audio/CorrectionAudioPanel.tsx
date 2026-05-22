@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import { Pause, Play } from 'lucide-react';
 
 import { useCorrectionAudio } from '@/hooks/useCorrectionAudio';
@@ -27,28 +27,25 @@ export const CorrectionAudioPanel = forwardRef<
   CorrectionAudioPanelProps
 >(function CorrectionAudioPanel({ session, segments }, ref) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
 
   const audioUrl = useMemo(() => {
     if (!session.audio_file_id) return null;
     return `/api/v1/audio/${session.audio_file_id}/stream`;
   }, [session.audio_file_id]);
 
-  const { play, pause, setRate, zoomToSegment } = useCorrectionAudio({
+  // isPlaying is sourced from the hook (synced via ws 'play'/'pause'/'finish' events)
+  // rather than local state to avoid divergence when wavesurfer stops unexpectedly.
+  const { play, pause, setRate, seekToSegment, isPlaying } = useCorrectionAudio({
     audioUrl,
     containerRef,
     segments,
   });
 
+  // useImperativeHandle uses stable refs from the hook — safe to depend on them.
   useImperativeHandle(ref, () => ({
     playToggle: () => {
-      if (isPlaying) {
-        pause();
-        setIsPlaying(false);
-      } else {
-        play();
-        setIsPlaying(true);
-      }
+      if (isPlaying) pause();
+      else play();
     },
   }), [isPlaying, play, pause]);
 
@@ -57,12 +54,17 @@ export const CorrectionAudioPanel = forwardRef<
   const setPlaybackRate = useCorrectionStore((s) => s.setPlaybackRate);
   const focusedSegmentId = useCorrectionStore((s) => s.focusedSegmentId);
 
-  // 焦點段落變更時 zoom + seek
+  // Spec §4.3 line 1088: clicking a segment → seek to start → auto-play.
+  // seekToSegment and play are stable useCallback refs from useCorrectionAudio,
+  // so this effect only fires when focusedSegmentId actually changes — not on
+  // every audioprocess-driven re-render.
   useEffect(() => {
     if (focusedSegmentId == null) return;
     const seg = segments.find((s) => s.id === focusedSegmentId);
-    if (seg) zoomToSegment(seg);
-  }, [focusedSegmentId, segments, zoomToSegment]);
+    if (!seg) return;
+    seekToSegment(seg);
+    play();
+  }, [focusedSegmentId, segments, seekToSegment, play]);
 
   const focusedSeg = segments.find((s) => s.id === focusedSegmentId);
   const correctedCount = segments.filter((s) => s.corrected_text && !s.is_skipped).length;
@@ -83,7 +85,7 @@ export const CorrectionAudioPanel = forwardRef<
         <button
           type="button"
           aria-label="播放 / 暫停"
-          onClick={() => { play(); setIsPlaying(true); }}
+          onClick={() => { play(); }}
           className="flex items-center gap-1 px-2 py-1 rounded bg-blue-500 text-white text-xs hover:bg-blue-600 focus-visible:ring-2 focus-visible:ring-blue-400"
         >
           <Play size={13} aria-hidden="true" />
@@ -93,7 +95,7 @@ export const CorrectionAudioPanel = forwardRef<
         <button
           type="button"
           aria-label="暫停"
-          onClick={() => { pause(); setIsPlaying(false); }}
+          onClick={() => { pause(); }}
           className="flex items-center gap-1 px-2 py-1 rounded border text-xs hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-slate-400"
         >
           <Pause size={13} aria-hidden="true" />

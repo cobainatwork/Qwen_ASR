@@ -1,6 +1,6 @@
 'use client';
 
-import { useContext, useRef } from 'react';
+import { useContext, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 
 import { AuthContext } from '@/components/auth/AuthProvider';
@@ -23,7 +23,13 @@ export default function CorrectionWorkbenchPage() {
   const sessionId = Number(session_id);
 
   // apiKeyId is not exposed by AuthContext in V1; hook accepts it as optional
-  const { session, segments, isLoading, error } = useCorrectionSession(sessionId, undefined);
+  const { session, segments: rawSegments, isLoading, error } = useCorrectionSession(sessionId, undefined);
+  // Stabilise the segments array reference: useCorrectionSession returns
+  // `segmentsQ.data ?? []` which creates a new [] each render when data is
+  // undefined. useMemo ensures the reference is stable when data is present,
+  // preventing useCorrectionAudio's useEffect from tearing down/recreating
+  // wavesurfer on every incidental page re-render.
+  const segments = useMemo(() => rawSegments, [rawSegments]);
 
   const audioPanelRef = useRef<CorrectionAudioPanelHandle | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
