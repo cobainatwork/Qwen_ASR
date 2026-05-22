@@ -309,6 +309,26 @@ def export_to_dataset(
     return success(ExportToDatasetData(inserted_count=inserted, dataset_id=payload.dataset_id))
 
 
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_session(
+    session_id: int,
+    api_key: ApiKey = Depends(require_scope("asr:write")),
+    db: Session = Depends(get_db),
+) -> None:
+    """硬刪除 correction_session + 連帶 segments（CASCADE）。
+
+    correction_segments.session_id FK ON DELETE CASCADE 自動清 segments。
+    CLAUDE.md #17：軟刪規範僅對 api_keys，其他資源硬刪 OK。
+    """
+    repo = CorrectionSessionRepository(db, api_key.id)
+    sess = repo.get(session_id)
+    if sess is None:
+        raise CorrectionSessionNotFoundError(details={"session_id": session_id})
+    repo.delete(sess)
+    db.commit()
+    return None
+
+
 @router.post("/sessions/{session_id}/export-jsonl")
 def export_jsonl(
     session_id: int,
