@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-import { useCorrectionSessionsListQuery } from '@/lib/api/correction';
+import {
+  useCorrectionSessionsListQuery,
+  useDeleteCorrectionSessionMutation,
+  type CorrectionSession,
+} from '@/lib/api/correction';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('zh-TW', {
@@ -26,6 +30,26 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${cls}`}>
       {status}
     </span>
+  );
+}
+
+function DeleteButton({ session }: { session: CorrectionSession }) {
+  const { mutate, isPending } = useDeleteCorrectionSessionMutation();
+
+  function handleDelete() {
+    if (!window.confirm(`確定要刪除工作階段「${session.name}」？此操作不可復原。`)) return;
+    mutate(session.id);
+  }
+
+  return (
+    <button
+      onClick={handleDelete}
+      disabled={isPending}
+      className="ml-3 text-red-400 hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-red-400/50 rounded text-sm"
+      aria-label={`刪除工作階段 ${session.name}`}
+    >
+      {isPending ? '刪除中...' : '刪除'}
+    </button>
   );
 }
 
@@ -97,13 +121,14 @@ export default function CorrectionIndexPage() {
                     <td className="px-4 py-3 text-foreground/70">
                       {formatDate(session.updated_at)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex items-center">
                       <Link
                         href={`/correction/${session.id}`}
                         className="text-accent hover:underline focus:outline-none focus:ring-2 focus:ring-accent/50 rounded"
                       >
                         開啟
                       </Link>
+                      <DeleteButton session={session} />
                     </td>
                   </tr>
                 ))}

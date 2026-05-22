@@ -196,6 +196,37 @@ export class CorrectionApi {
   }
 
   /**
+   * 硬刪除校正工作階段（含 segments CASCADE）
+   * DELETE /api/v1/correction/sessions/{session_id}
+   */
+  async deleteSession(sessionId: number): Promise<void> {
+    const token = this.getToken();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+    try {
+      const resp = await fetch(`${this.baseUrl}/api/v1/correction/sessions/${sessionId}`, {
+        method: 'DELETE',
+        signal: controller.signal,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!resp.ok) {
+        let code = 'DELETE_FAILED';
+        let message = `刪除失敗（HTTP ${resp.status}）`;
+        try {
+          const json = await resp.json();
+          code = json?.error?.code ?? code;
+          message = json?.error?.message ?? message;
+        } catch {
+          // ignore parse error
+        }
+        throw new CorrectionApiError(code, message, resp.status);
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
    * 評估工作階段品質
    * POST /api/v1/correction/sessions/{session_id}/evaluate-quality
    */
@@ -377,6 +408,22 @@ export function useEvaluateQualityMutation(sessionId: number) {
   const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
   return useMutation({
     mutationFn: () => api.evaluateQuality(sessionId),
+  });
+}
+
+/**
+ * DELETE /api/v1/correction/sessions/{sessionId}
+ * 硬刪除校正工作階段，成功後 invalidate sessions list
+ */
+export function useDeleteCorrectionSessionMutation() {
+  const { token } = useContext(AuthContext);
+  const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: number) => api.deleteSession(sessionId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['correction', 'sessions-list'] });
+    },
   });
 }
 

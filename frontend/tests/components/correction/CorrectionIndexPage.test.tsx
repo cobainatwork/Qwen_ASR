@@ -1,9 +1,12 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 
-// Mock TanStack Query hook — test only the render layer.
+const mockMutate = jest.fn();
+
+// Mock TanStack Query hooks — test only the render layer.
 jest.mock('@/lib/api/correction', () => ({
   useCorrectionSessionsListQuery: jest.fn(),
+  useDeleteCorrectionSessionMutation: jest.fn(),
 }));
 
 // Mock next/link
@@ -24,11 +27,33 @@ jest.mock('next/link', () => {
 
 // Import after mocks are registered at module level so React singleton is stable.
 import CorrectionIndexPage from '@/app/correction/page';
-import { useCorrectionSessionsListQuery } from '@/lib/api/correction';
+import { useCorrectionSessionsListQuery, useDeleteCorrectionSessionMutation } from '@/lib/api/correction';
 
 const mockQuery = useCorrectionSessionsListQuery as jest.Mock;
+const mockDeleteMutation = useDeleteCorrectionSessionMutation as jest.Mock;
+
+// Shared session fixture used by multiple tests
+const SESSION_FIXTURE = {
+  id: 42,
+  name: 'Test Session',
+  status: 'in_progress',
+  created_at: '2026-05-01T10:00:00Z',
+  updated_at: '2026-05-02T12:00:00Z',
+  transcription_id: 1,
+  audio_file_id: null,
+};
+
+const DATA_WITH_ONE_SESSION = {
+  items: [SESSION_FIXTURE],
+  pagination: { total: 1, page: 1, limit: 20, total_pages: 1 },
+};
 
 describe('CorrectionIndexPage', () => {
+  beforeEach(() => {
+    // Default: delete mutation idle, no pending
+    mockDeleteMutation.mockReturnValue({ mutate: mockMutate, isPending: false });
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
   });
@@ -59,26 +84,55 @@ describe('CorrectionIndexPage', () => {
     mockQuery.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: {
-        items: [
-          {
-            id: 42,
-            name: 'Test Session',
-            status: 'in_progress',
-            created_at: '2026-05-01T10:00:00Z',
-            updated_at: '2026-05-02T12:00:00Z',
-            transcription_id: 1,
-            audio_file_id: null,
-          },
-        ],
-        pagination: { total: 1, page: 1, limit: 20, total_pages: 1 },
-      },
+      data: DATA_WITH_ONE_SESSION,
     });
     render(<CorrectionIndexPage />);
     expect(screen.getByText('Test Session')).toBeInTheDocument();
     expect(screen.getByText('in_progress')).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /開啟/ });
     expect(link).toHaveAttribute('href', '/correction/42');
+  });
+
+  test('renders delete button for each session row', () => {
+    mockQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: DATA_WITH_ONE_SESSION,
+    });
+    render(<CorrectionIndexPage />);
+    const deleteBtn = screen.getByRole('button', { name: /刪除工作階段 Test Session/ });
+    expect(deleteBtn).toBeInTheDocument();
+    expect(deleteBtn).not.toBeDisabled();
+  });
+
+  test('confirm true → triggers delete mutation with session id', () => {
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    mockQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: DATA_WITH_ONE_SESSION,
+    });
+    render(<CorrectionIndexPage />);
+    const deleteBtn = screen.getByRole('button', { name: /刪除工作階段 Test Session/ });
+    fireEvent.click(deleteBtn);
+    expect(window.confirm).toHaveBeenCalledWith(
+      '確定要刪除工作階段「Test Session」？此操作不可復原。',
+    );
+    expect(mockMutate).toHaveBeenCalledWith(42);
+  });
+
+  test('confirm false → does not trigger delete mutation', () => {
+    jest.spyOn(window, 'confirm').mockReturnValue(false);
+    mockQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: DATA_WITH_ONE_SESSION,
+    });
+    render(<CorrectionIndexPage />);
+    const deleteBtn = screen.getByRole('button', { name: /刪除工作階段 Test Session/ });
+    fireEvent.click(deleteBtn);
+    expect(window.confirm).toHaveBeenCalled();
+    expect(mockMutate).not.toHaveBeenCalled();
   });
 
   test('renders accessible table with caption', () => {
