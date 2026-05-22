@@ -11,6 +11,7 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     AudioFileTooLargeError,
     NotFoundError,
+    TranscriptionNotFoundError,
     ValidationFailedError,
 )
 from app.core.idempotency import get_idempotency_cache, idempotent
@@ -352,3 +353,27 @@ def list_transcriptions(
             ),
         )
     )
+
+
+@router.delete("/transcriptions/{transcription_id}", status_code=204)
+def delete_transcription(
+    transcription_id: int,
+    api_key: ApiKey = Depends(require_scope("asr:write")),
+    db: Session = Depends(get_db),
+) -> None:
+    """硬刪 transcription DB row + CASCADE 相關 correction_sessions + correction_segments。
+
+    correction_sessions.transcription_id FK ON DELETE CASCADE（migration 0006）
+    自動清 sessions；correction_segments.session_id FK ON DELETE CASCADE 自動清 segments。
+    audio_file row 保留（其他 transcription 可能 reuse 同 audio_file）。
+    CLAUDE.md 強制規範 #17：軟刪僅對 api_keys，其他資源硬刪 OK。
+    """
+    from app.repositories.transcription import TranscriptionRepository
+
+    repo = TranscriptionRepository(db, api_key.id)
+    tx = repo.get(transcription_id)
+    if tx is None:
+        raise TranscriptionNotFoundError(details={"transcription_id": transcription_id})
+    repo.delete(tx)
+    db.commit()
+    return None
