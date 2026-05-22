@@ -8,7 +8,7 @@ import { TranscriptionResult } from '@/components/asr/TranscriptionResult';
 import { AudioPlayer, type AudioPlayerHandle } from '@/components/asr/AudioPlayer';
 import { TranscriptViewer } from '@/components/asr/TranscriptViewer';
 import { ExportButtons } from '@/components/asr/ExportButtons';
-import { useCreateCorrectionSessionMutation } from '@/lib/api/correction';
+import { CorrectionApiError, useCreateCorrectionSessionMutation } from '@/lib/api/correction';
 import type { TranscribeData } from '@/lib/api/types';
 
 const STORAGE_KEY = 'qwen-asr:last-transcribe-result';
@@ -93,6 +93,24 @@ export default function Page() {
     playerRef.current?.seek(seconds);
   };
 
+  const handleEnterCorrection = async () => {
+    if (!stored?.data.transcription_id) return;
+    try {
+      const sess = await createSessionM.mutateAsync({
+        transcription_id: stored.data.transcription_id,
+      });
+      router.push(`/correction/${sess.id}`);
+    } catch (e) {
+      if (e instanceof CorrectionApiError && e.code === 'TRANSCRIPTION_NOT_FOUND') {
+        try { sessionStorage.removeItem(STORAGE_KEY); } catch {/* 靜默 */}
+        window.alert('此辨識紀錄已不存在（可能已被刪除）。請重新上傳音檔。');
+        window.location.reload();
+      } else {
+        window.alert(`進入校正失敗：${(e as Error).message}`);
+      }
+    }
+  };
+
   return (
     <div className="asr-page">
       <div className="asr-upload-area">
@@ -141,12 +159,7 @@ export default function Page() {
                 <ExportButtons data={stored.data} baseFilename={`transcription-${stored.data.transcription_id}`} />
                 <button
                   type="button"
-                  onClick={async () => {
-                    const sess = await createSessionM.mutateAsync({
-                      transcription_id: stored.data.transcription_id,
-                    });
-                    router.push(`/correction/${sess.id}`);
-                  }}
+                  onClick={handleEnterCorrection}
                   disabled={createSessionM.isPending}
                   className="rounded-lg border border-accent/50 bg-accent/10 px-3 py-1.5 text-xs text-accent hover:bg-accent/20 disabled:opacity-50 transition-colors"
                 >

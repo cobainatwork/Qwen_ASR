@@ -7,14 +7,23 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+const mockInvalidateQueries = jest.fn();
+jest.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
+}));
+
 jest.mock('@/lib/api/asr', () => ({
   useTranscriptionsListQuery: jest.fn(),
   useDeleteTranscriptionMutation: jest.fn(),
 }));
 
-jest.mock('@/lib/api/correction', () => ({
-  useCreateCorrectionSessionMutation: jest.fn(),
-}));
+jest.mock('@/lib/api/correction', () => {
+  const actual = jest.requireActual<typeof import('@/lib/api/correction')>('@/lib/api/correction');
+  return {
+    ...actual,
+    useCreateCorrectionSessionMutation: jest.fn(),
+  };
+});
 
 import HistoryPage from '@/app/history/page';
 import { useDeleteTranscriptionMutation, useTranscriptionsListQuery } from '@/lib/api/asr';
@@ -187,5 +196,58 @@ describe('HistoryPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /刪除/ }));
 
     expect(mockDeleteMutate).not.toHaveBeenCalled();
+  });
+
+  // ─── EnterCorrectionButton error-branch tests ──────────────────────────────
+
+  test('"進入校正" TRANSCRIPTION_NOT_FOUND → alert + invalidateQueries called', async () => {
+    const { CorrectionApiError } = jest.requireActual<typeof import('@/lib/api/correction')>('@/lib/api/correction');
+    const mockMutateAsync = jest.fn().mockRejectedValueOnce(
+      new CorrectionApiError('TRANSCRIPTION_NOT_FOUND', '轉錄紀錄不存在', 404),
+    );
+    mockQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        items: [MOCK_TX],
+        pagination: { total: 1, page: 1, limit: 20, total_pages: 1 },
+      },
+    });
+    mockMutation.mockReturnValue({ mutateAsync: mockMutateAsync, isPending: false });
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    render(<HistoryPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: /進入校正/ }));
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/已不存在/));
+    expect(mockInvalidateQueries).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['asr', 'transcriptions'] }),
+    );
+    expect(mockPush).not.toHaveBeenCalled();
+
+    alertSpy.mockRestore();
+  });
+
+  test('"進入校正" non-404 error → alert with generic message, no invalidateQueries', async () => {
+    const mockMutateAsync = jest.fn().mockRejectedValueOnce(new Error('伺服器錯誤'));
+    mockQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        items: [MOCK_TX],
+        pagination: { total: 1, page: 1, limit: 20, total_pages: 1 },
+      },
+    });
+    mockMutation.mockReturnValue({ mutateAsync: mockMutateAsync, isPending: false });
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    render(<HistoryPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: /進入校正/ }));
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/進入校正失敗/));
+    expect(mockInvalidateQueries).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+
+    alertSpy.mockRestore();
   });
 });

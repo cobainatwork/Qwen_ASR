@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Card } from '@/components/ui/Card';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDeleteTranscriptionMutation, useTranscriptionsListQuery } from '@/lib/api/asr';
-import { useCreateCorrectionSessionMutation } from '@/lib/api/correction';
+import { CorrectionApiError, useCreateCorrectionSessionMutation } from '@/lib/api/correction';
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('zh-TW', {
@@ -56,15 +57,27 @@ function DeleteTranscriptionButton({ transcriptionId }: { transcriptionId: numbe
 
 function EnterCorrectionButton({ transcriptionId }: { transcriptionId: number }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const createSessionM = useCreateCorrectionSessionMutation();
+
+  const handleClick = async () => {
+    try {
+      const sess = await createSessionM.mutateAsync({ transcription_id: transcriptionId });
+      router.push(`/correction/${sess.id}`);
+    } catch (e) {
+      if (e instanceof CorrectionApiError && e.code === 'TRANSCRIPTION_NOT_FOUND') {
+        window.alert('此辨識紀錄已不存在（可能已被其他 tab 刪除）。列表將重新整理。');
+        void queryClient.invalidateQueries({ queryKey: ['asr', 'transcriptions'] });
+      } else {
+        window.alert(`進入校正失敗：${(e as Error).message}`);
+      }
+    }
+  };
 
   return (
     <button
       type="button"
-      onClick={async () => {
-        const sess = await createSessionM.mutateAsync({ transcription_id: transcriptionId });
-        router.push(`/correction/${sess.id}`);
-      }}
+      onClick={handleClick}
       disabled={createSessionM.isPending}
       className="rounded-lg border border-accent/50 bg-accent/10 px-2 py-1 text-xs text-accent hover:bg-accent/20 disabled:opacity-50 transition-colors"
     >

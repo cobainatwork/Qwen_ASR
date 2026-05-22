@@ -107,12 +107,16 @@ jest.mock('next/navigation', () => ({
 }));
 
 const mockMutateAsync = jest.fn();
-jest.mock('@/lib/api/correction', () => ({
-  useCreateCorrectionSessionMutation: () => ({
-    mutateAsync: mockMutateAsync,
-    isPending: false,
-  }),
-}));
+jest.mock('@/lib/api/correction', () => {
+  const actual = jest.requireActual<typeof import('@/lib/api/correction')>('@/lib/api/correction');
+  return {
+    ...actual,
+    useCreateCorrectionSessionMutation: () => ({
+      mutateAsync: mockMutateAsync,
+      isPending: false,
+    }),
+  };
+});
 
 describe('HomePage — 進入校正工作台 button', () => {
   beforeEach(() => {
@@ -136,5 +140,48 @@ describe('HomePage — 進入校正工作台 button', () => {
 
     expect(mockMutateAsync).toHaveBeenCalledWith({ transcription_id: 99 });
     expect(mockPush).toHaveBeenCalledWith('/correction/42');
+  });
+
+  test('TRANSCRIPTION_NOT_FOUND → alert + sessionStorage cleared + page reloaded', async () => {
+    const { CorrectionApiError } = jest.requireActual<typeof import('@/lib/api/correction')>('@/lib/api/correction');
+    mockMutateAsync.mockRejectedValueOnce(new CorrectionApiError('TRANSCRIPTION_NOT_FOUND', '轉錄紀錄不存在', 404));
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    const reloadMock = jest.fn();
+    Object.defineProperty(window, 'location', {
+      value: { ...window.location, reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(REHYDRATABLE_PAYLOAD));
+
+    render(<HomePage />);
+    // rehydrate: page.tsx reads sessionStorage on mount, so result + button appear
+    await userEvent.click(screen.getByRole('button', { name: /進入校正工作台/ }));
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/已不存在/));
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(reloadMock).toHaveBeenCalledTimes(1);
+
+    alertSpy.mockRestore();
+  });
+
+  test('non-404 error → alert with generic message, no reload', async () => {
+    mockMutateAsync.mockRejectedValueOnce(new Error('伺服器錯誤'));
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    const reloadMock = jest.fn();
+    Object.defineProperty(window, 'location', {
+      value: { ...window.location, reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
+
+    render(<HomePage />);
+    await userEvent.click(screen.getByRole('button', { name: 'mock-result' }));
+    await userEvent.click(screen.getByRole('button', { name: /進入校正工作台/ }));
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/進入校正失敗/));
+    expect(reloadMock).not.toHaveBeenCalled();
+
+    alertSpy.mockRestore();
   });
 });
