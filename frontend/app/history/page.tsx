@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Card } from '@/components/ui/Card';
-import { useTranscriptionsListQuery } from '@/lib/api/asr';
+import { useDeleteTranscriptionMutation, useTranscriptionsListQuery } from '@/lib/api/asr';
 import { useCreateCorrectionSessionMutation } from '@/lib/api/correction';
 
 function formatDate(iso: string): string {
@@ -28,6 +28,29 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${cls}`}>
       {status}
     </span>
+  );
+}
+
+function DeleteTranscriptionButton({ transcriptionId }: { transcriptionId: number }) {
+  const deleteM = useDeleteTranscriptionMutation();
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (
+          window.confirm(
+            '確定要刪除這筆辨識紀錄？此操作將同時刪除相關的校正工作階段，不可復原。',
+          )
+        ) {
+          deleteM.mutate(transcriptionId);
+        }
+      }}
+      disabled={deleteM.isPending}
+      className="rounded-lg border border-red-500/50 bg-red-500/10 px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 disabled:opacity-50 transition-colors"
+    >
+      {deleteM.isPending ? '刪除中...' : '刪除'}
+    </button>
   );
 }
 
@@ -132,9 +155,12 @@ export default function HistoryPage() {
                           {formatDate(tx.created_at)}
                         </td>
                         <td className="px-4 py-3">
-                          {tx.status === 'completed' && (
-                            <EnterCorrectionButton transcriptionId={tx.id} />
-                          )}
+                          <div className="flex items-center gap-2">
+                            {tx.status === 'completed' && (
+                              <EnterCorrectionButton transcriptionId={tx.id} />
+                            )}
+                            <DeleteTranscriptionButton transcriptionId={tx.id} />
+                          </div>
                         </td>
                       </tr>
                     ))}

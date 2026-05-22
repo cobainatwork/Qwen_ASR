@@ -9,6 +9,7 @@ jest.mock('next/navigation', () => ({
 
 jest.mock('@/lib/api/asr', () => ({
   useTranscriptionsListQuery: jest.fn(),
+  useDeleteTranscriptionMutation: jest.fn(),
 }));
 
 jest.mock('@/lib/api/correction', () => ({
@@ -16,11 +17,12 @@ jest.mock('@/lib/api/correction', () => ({
 }));
 
 import HistoryPage from '@/app/history/page';
-import { useTranscriptionsListQuery } from '@/lib/api/asr';
+import { useDeleteTranscriptionMutation, useTranscriptionsListQuery } from '@/lib/api/asr';
 import { useCreateCorrectionSessionMutation } from '@/lib/api/correction';
 
 const mockQuery = useTranscriptionsListQuery as jest.Mock;
 const mockMutation = useCreateCorrectionSessionMutation as jest.Mock;
+const mockDeleteMutation = useDeleteTranscriptionMutation as jest.Mock;
 
 const MOCK_TX = {
   id: 7,
@@ -35,9 +37,16 @@ const MOCK_TX = {
 };
 
 describe('HistoryPage', () => {
+  const mockDeleteMutate = jest.fn();
+
+  beforeEach(() => {
+    mockDeleteMutation.mockReturnValue({ mutate: mockDeleteMutate, isPending: false });
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
     mockPush.mockReset();
+    mockDeleteMutate.mockReset();
   });
 
   test('shows loading state', () => {
@@ -126,5 +135,57 @@ describe('HistoryPage', () => {
 
     expect(mockMutateAsync).toHaveBeenCalledWith({ transcription_id: 7 });
     expect(mockPush).toHaveBeenCalledWith('/correction/5');
+  });
+
+  // ─── Delete button tests ───────────────────────────────────────────────────
+
+  test('"刪除" button rendered for every row', () => {
+    mockQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        items: [MOCK_TX],
+        pagination: { total: 1, page: 1, limit: 20, total_pages: 1 },
+      },
+    });
+    mockMutation.mockReturnValue({ mutateAsync: jest.fn(), isPending: false });
+    render(<HistoryPage />);
+    expect(screen.getByRole('button', { name: /刪除/ })).toBeInTheDocument();
+  });
+
+  test('confirm true → triggers delete mutation with correct id', async () => {
+    jest.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    mockQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        items: [MOCK_TX],
+        pagination: { total: 1, page: 1, limit: 20, total_pages: 1 },
+      },
+    });
+    mockMutation.mockReturnValue({ mutateAsync: jest.fn(), isPending: false });
+    render(<HistoryPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: /刪除/ }));
+
+    expect(mockDeleteMutate).toHaveBeenCalledWith(7);
+  });
+
+  test('confirm false → does NOT trigger delete mutation', async () => {
+    jest.spyOn(window, 'confirm').mockReturnValueOnce(false);
+    mockQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        items: [MOCK_TX],
+        pagination: { total: 1, page: 1, limit: 20, total_pages: 1 },
+      },
+    });
+    mockMutation.mockReturnValue({ mutateAsync: jest.fn(), isPending: false });
+    render(<HistoryPage />);
+
+    await userEvent.click(screen.getByRole('button', { name: /刪除/ }));
+
+    expect(mockDeleteMutate).not.toHaveBeenCalled();
   });
 });

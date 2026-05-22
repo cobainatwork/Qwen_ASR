@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useContext, useMemo } from 'react';
 
 import { AuthContext } from '@/components/auth/AuthProvider';
@@ -69,6 +69,34 @@ class AsrApi {
     }
     return json.data;
   }
+
+  /**
+   * 硬刪 transcription row + CASCADE correction_sessions + segments。
+   * audio_file 保留。
+   * DELETE /api/v1/asr/transcriptions/{transcriptionId}
+   */
+  async deleteTranscription(transcriptionId: number): Promise<void> {
+    const token = this.getToken();
+    const resp = await fetch(
+      `${this.baseUrl}/api/v1/asr/transcriptions/${transcriptionId}`,
+      {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      },
+    );
+    if (!resp.ok) {
+      let code = 'DELETE_FAILED';
+      let message = `刪除失敗（HTTP ${resp.status}）`;
+      try {
+        const json = await resp.json();
+        code = json?.error?.code ?? code;
+        message = json?.error?.message ?? message;
+      } catch {
+        // ignore JSON parse error
+      }
+      throw new AsrApiError(code, message, resp.status);
+    }
+  }
 }
 
 // ─── TanStack Query hooks ─────────────────────────────────────────────────────
@@ -80,5 +108,21 @@ export function useTranscriptionsListQuery(page = 1, limit = 20) {
     queryKey: ['asr', 'transcriptions', page, limit],
     queryFn: () => api.listTranscriptions(page, limit),
     enabled: token != null,
+  });
+}
+
+/**
+ * DELETE /api/v1/asr/transcriptions/{transcriptionId}
+ * 硬刪 transcription，成功後 invalidate transcriptions-list 快取使列表自動刷新。
+ */
+export function useDeleteTranscriptionMutation() {
+  const { token } = useContext(AuthContext);
+  const api = useMemo(() => new AsrApi({ getToken: () => token }), [token]);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (transcriptionId: number) => api.deleteTranscription(transcriptionId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['asr', 'transcriptions'] });
+    },
   });
 }
