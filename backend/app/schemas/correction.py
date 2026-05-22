@@ -5,6 +5,12 @@ from pydantic import BaseModel, Field, model_validator
 from app.schemas.common import PaginationMeta
 
 
+class CreateCorrectionSessionRequest(BaseModel):
+    transcription_id: int
+    # 若未提供，從 audio_file.original_name 或 f"轉錄 #{transcription_id}" 生成
+    name: str | None = None
+
+
 class QualityEvalIssue(BaseModel):
     code: str
     message: str | None = None

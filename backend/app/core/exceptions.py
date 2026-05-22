@@ -257,6 +257,12 @@ class CorrectionSessionNotFoundError(AppException):
     message = "校正 session 不存在"
 
 
+class TranscriptionNotFoundError(AppException):
+    code = "TRANSCRIPTION_NOT_FOUND"
+    http_status = 404
+    message = "轉錄紀錄不存在"
+
+
 class CorrectionVersionMismatchError(AppException):
     code = "CORRECTION_VERSION_MISMATCH"
     http_status = 409
@@ -304,6 +310,7 @@ ALL_ERROR_CODES: tuple[str, ...] = (
     "ASR_INFERENCE_FAILED",
     "ASR_REQUEST_TIMEOUT",
     "QUEUE_FULL",
+    "TRANSCRIPTION_NOT_FOUND",
     "HOTWORD_GROUP_NOT_FOUND",
     "HOTWORD_TOO_LARGE",
     "DATASET_NOT_FOUND",

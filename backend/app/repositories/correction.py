@@ -72,6 +72,7 @@ class CorrectionSegmentRepository:
                     start_sec=seg["start_sec"],
                     end_sec=seg["end_sec"],
                     original_text=seg["text"],
+                    speaker_label=seg.get("speaker_label"),
                 )
             )
         self.db.flush()

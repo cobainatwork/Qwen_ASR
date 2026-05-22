@@ -1,4 +1,8 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
+
+from app.schemas.common import PaginationMeta
 
 
 class TranscribeOptions(BaseModel):
@@ -48,6 +52,25 @@ class TranscribeData(BaseModel):
     resampling_warning: bool
     vad_segments_count: int
     warnings: list[str] = Field(default_factory=list)
+
+
+class TranscriptionListItem(BaseModel):
+    """列表 API 回應項目 — 排除 JSONB/TEXT 大欄位（CLAUDE.md 強制規範 #4）。"""
+
+    id: int
+    file_name: str | None
+    source: str
+    status: str
+    duration_sec: float | None
+    language: str | None
+    model_version: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class TranscriptionListData(BaseModel):
+    items: list[TranscriptionListItem]
+    pagination: PaginationMeta
 
 
 # diarization 由 settings.DIARIZATION_ENABLED 控制（M7 起支援），不再列入「Phase 1 不支援」。

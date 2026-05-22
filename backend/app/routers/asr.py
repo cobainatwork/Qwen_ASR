@@ -25,9 +25,11 @@ from app.schemas.asr import (
     Timestamp,
     TranscribeData,
     TranscribeOptions,
+    TranscriptionListData,
+    TranscriptionListItem,
     collect_unsupported_warnings,
 )
-from app.schemas.common import ResponseEnvelope
+from app.schemas.common import PaginationMeta, ResponseEnvelope
 from app.services.asr.consumer import wait_for_job
 from app.services.asr.queue import AsrJob, QueueBackend, QueuePriority
 from app.services.audio import (
@@ -291,3 +293,62 @@ async def transcribe_stored(
     if idem_key is not None:
         get_idempotency_cache().record(idem_key, result.model_dump(mode="json"))
     return success(result)
+
+
+@router.get("/transcriptions", response_model=ResponseEnvelope[TranscriptionListData])
+def list_transcriptions(
+    page: int = 1,
+    limit: int = 20,
+    api_key: ApiKey = Depends(require_scope("asr:read")),
+    db: Session = Depends(get_db),
+) -> ResponseEnvelope[TranscriptionListData]:
+    """列出本 tenant 所有辨識紀錄（分頁）。
+
+    CLAUDE.md 強制規範 #4：排除 timestamps / speakers / post_processing /
+    transcript_text 等 JSONB/TEXT 大欄位，完整內容透過詳情 API 取得。
+    """
+    import math
+
+    from sqlalchemy import func, select
+
+    from app.models.transcription import Transcription
+
+    base_q = select(Transcription).where(Transcription.api_key_id == api_key.id)
+    total: int = db.execute(
+        select(func.count()).select_from(base_q.subquery())
+    ).scalar_one()
+    rows = list(
+        db.execute(
+            base_q.order_by(Transcription.created_at.desc())
+            .limit(limit)
+            .offset((page - 1) * limit)
+        )
+        .scalars()
+        .all()
+    )
+    total_pages = max(1, math.ceil(total / limit)) if total > 0 else 1
+    items = [
+        TranscriptionListItem(
+            id=r.id,
+            file_name=r.file_name,
+            source=r.source,
+            status=r.status,
+            duration_sec=r.duration_sec,
+            language=r.language,
+            model_version=r.model_version,
+            created_at=r.created_at,
+            updated_at=r.updated_at,
+        )
+        for r in rows
+    ]
+    return success(
+        TranscriptionListData(
+            items=items,
+            pagination=PaginationMeta(
+                total=total,
+                page=page,
+                limit=limit,
+                total_pages=total_pages,
+            ),
+        )
+    )

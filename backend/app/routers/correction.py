@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
@@ -8,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.exceptions import CorrectionSessionNotFoundError
+from app.core.exceptions import CorrectionSessionNotFoundError, TranscriptionNotFoundError
 from app.core.response import success
 from app.deps.auth import require_scope
 from app.deps.db import get_db
@@ -19,12 +20,14 @@ from app.repositories.correction import (
     CorrectionSegmentRepository,
     CorrectionSessionRepository,
 )
+from app.repositories.transcription import TranscriptionRepository
 from app.schemas.common import PaginationMeta, ResponseEnvelope
 from app.schemas.correction import (
     CorrectionSegmentData,
     CorrectionSegmentUpdate,
     CorrectionSessionData,
     CorrectionSessionListData,
+    CreateCorrectionSessionRequest,
     ExportToDatasetData,
     ExportToDatasetRequest,
     QualityEvalData,
@@ -79,6 +82,117 @@ def _to_segment(seg: CorrectionSegment) -> CorrectionSegmentData:
         version=seg.version,
         updated_at=seg.updated_at,
     )
+
+
+def _build_segments_from_transcription(
+    transcription: Transcription,
+) -> list[dict[str, Any]]:
+    """Decompose transcription JSONB into segment dicts for bulk_create.
+
+    Strategy:
+    - If `speakers` is non-empty: for each speaker turn {speaker, start, end},
+      collect all word-level timestamps whose start falls in [turn.start, turn.end),
+      concatenate their `text` fields, use turn timing for start_sec/end_sec,
+      and carry the speaker label.
+    - If `speakers` is empty/None: produce one segment spanning the entire
+      transcription, using `transcript_text` as `text`.
+    """
+    speakers: list[dict[str, Any]] = transcription.speakers or []
+    timestamps: list[dict[str, Any]] = transcription.timestamps or []
+    full_text: str = transcription.transcript_text or ""
+
+    if not speakers:
+        duration = transcription.duration_sec or 0.0
+        return [
+            {
+                "start_sec": 0.0,
+                "end_sec": duration,
+                "text": full_text,
+            }
+        ]
+
+    segments: list[dict[str, Any]] = []
+    for turn in speakers:
+        t_start: float = float(turn.get("start", 0.0))
+        t_end: float = float(turn.get("end", t_start))
+        speaker: str = str(turn.get("speaker", ""))
+
+        words_in_turn = [
+            w["text"]
+            for w in timestamps
+            if float(w.get("start", 0.0)) >= t_start
+            and float(w.get("start", 0.0)) < t_end
+            and w.get("text")
+        ]
+        text = "".join(words_in_turn) if words_in_turn else ""
+
+        segments.append(
+            {
+                "start_sec": t_start,
+                "end_sec": t_end,
+                "text": text,
+                "speaker_label": speaker if speaker else None,
+            }
+        )
+    return segments
+
+
+@router.post("/sessions", response_model=ResponseEnvelope[CorrectionSessionData])
+def create_session(
+    payload: CreateCorrectionSessionRequest,
+    api_key: ApiKey = Depends(require_scope("asr:write")),
+    db: Session = Depends(get_db),
+) -> ResponseEnvelope[CorrectionSessionData]:
+    """從現有 transcription 建立 correction session（idempotent）。
+
+    若該 transcription 已有 correction_session，直接回傳既有 session。
+    Transcription 的 speakers + timestamps JSONB 拆成 CorrectionSegment 列表。
+    """
+    # 1. 驗證 transcription 屬於本 tenant
+    tx_repo = TranscriptionRepository(db, api_key.id)
+    transcription = tx_repo.get(payload.transcription_id)
+    if transcription is None:
+        raise TranscriptionNotFoundError(details={"transcription_id": payload.transcription_id})
+
+    # 2. Idempotency：若已存在 session，直接回傳
+    existing_sess = db.execute(
+        select(CorrectionSession).where(
+            CorrectionSession.transcription_id == payload.transcription_id,
+            CorrectionSession.api_key_id == api_key.id,
+        )
+    ).scalar_one_or_none()
+    if existing_sess is not None:
+        return success(_to_session(existing_sess, db, api_key.id))
+
+    # 3. 決定 session 名稱
+    if payload.name:
+        session_name = payload.name
+    else:
+        audio_file_id = _get_audio_file_id(db, payload.transcription_id, api_key.id)
+        if audio_file_id is not None:
+            af = db.get(AudioFile, audio_file_id)
+            af_name = af.original_name if af and af.original_name else None
+            session_name = af_name or f"轉錄 #{payload.transcription_id}"
+        else:
+            session_name = transcription.file_name or f"轉錄 #{payload.transcription_id}"
+
+    # 4. 建立 CorrectionSession
+    sess = CorrectionSession(
+        api_key_id=api_key.id,
+        transcription_id=payload.transcription_id,
+        name=session_name,
+        status="in_progress",
+    )
+    db.add(sess)
+    db.flush()
+
+    # 5. 拆 segments
+    segments_data = _build_segments_from_transcription(transcription)
+    seg_repo = CorrectionSegmentRepository(db, api_key.id)
+    seg_repo.bulk_create(sess.id, segments_data)
+    db.commit()
+
+    return success(_to_session(sess, db, api_key.id))
 
 
 @router.get("/sessions", response_model=ResponseEnvelope[CorrectionSessionListData])
