@@ -37,6 +37,18 @@ export interface UpdateSegmentPayload {
   expected_version: number;
 }
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
+export interface CorrectionSessionListData {
+  items: CorrectionSession[];
+  pagination: PaginationMeta;
+}
+
 export interface ExportToDatasetPayload {
   dataset_id: number;
 }
@@ -71,6 +83,20 @@ export class CorrectionApi {
   constructor(options: CorrectionApiOptions) {
     this.baseUrl = options.baseUrl ?? '';
     this.getToken = options.getToken;
+  }
+
+  /**
+   * 列出所有校正工作階段（分頁）
+   * GET /api/v1/correction/sessions
+   */
+  async listSessions(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<CorrectionSessionListData> {
+    return this.request<CorrectionSessionListData>(
+      `/api/v1/correction/sessions?page=${page}&limit=${limit}`,
+      { method: 'GET' },
+    );
   }
 
   /**
@@ -230,6 +256,23 @@ export class CorrectionApi {
 }
 
 // ─── TanStack Query hooks（A3 主用） ──────────────────────────────────────────
+
+/**
+ * GET /api/v1/correction/sessions
+ * 列出所有校正工作階段（分頁）
+ */
+export function useCorrectionSessionsListQuery(
+  page: number = 1,
+  limit: number = 20,
+) {
+  const { token } = useContext(AuthContext);
+  const api = useMemo(() => new CorrectionApi({ getToken: () => token }), [token]);
+  return useQuery({
+    queryKey: ['correction', 'sessions-list', page, limit],
+    queryFn: () => api.listSessions(page, limit),
+    enabled: token != null,
+  });
+}
 
 /**
  * GET /api/v1/correction/sessions/{sessionId}

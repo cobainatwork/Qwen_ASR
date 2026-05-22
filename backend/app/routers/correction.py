@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy import select
@@ -17,11 +19,12 @@ from app.repositories.correction import (
     CorrectionSegmentRepository,
     CorrectionSessionRepository,
 )
-from app.schemas.common import ResponseEnvelope
+from app.schemas.common import PaginationMeta, ResponseEnvelope
 from app.schemas.correction import (
     CorrectionSegmentData,
     CorrectionSegmentUpdate,
     CorrectionSessionData,
+    CorrectionSessionListData,
     ExportToDatasetData,
     ExportToDatasetRequest,
     QualityEvalData,
@@ -75,6 +78,30 @@ def _to_segment(seg: CorrectionSegment) -> CorrectionSegmentData:
         is_skipped=seg.is_skipped,
         version=seg.version,
         updated_at=seg.updated_at,
+    )
+
+
+@router.get("/sessions", response_model=ResponseEnvelope[CorrectionSessionListData])
+def list_sessions(
+    page: int = 1,
+    limit: int = 20,
+    api_key: ApiKey = Depends(require_scope("asr:read")),
+    db: Session = Depends(get_db),
+) -> ResponseEnvelope[CorrectionSessionListData]:
+    """列出本 tenant 所有校正工作階段（分頁）。"""
+    repo = CorrectionSessionRepository(db, api_key.id)
+    items, total = repo.list_by_api_key(page=page, limit=limit)
+    total_pages = max(1, math.ceil(total / limit)) if total > 0 else 1
+    return success(
+        CorrectionSessionListData(
+            items=[_to_session(s, db, api_key.id) for s in items],
+            pagination=PaginationMeta(
+                total=total,
+                page=page,
+                limit=limit,
+                total_pages=total_pages,
+            ),
+        )
     )
 
 

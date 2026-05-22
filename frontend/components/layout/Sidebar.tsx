@@ -29,7 +29,7 @@ const ALWAYS_VISIBLE: NavItem[] = [
 ];
 
 const VENDOR_ONLY: NavItem[] = [
-  { href: '/finetune/correction', label: '校正工作台', icon: FileEdit },
+  { href: '/correction', label: '校正工作台', icon: FileEdit },
   { href: '/finetune/datasets', label: '資料集管理', icon: Database },
   { href: '/finetune/training', label: '訓練管理', icon: GraduationCap },
   { href: '/finetune/hotwords', label: 'Hotword', icon: Hash },

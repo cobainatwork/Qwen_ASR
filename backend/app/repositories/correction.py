@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import CorrectionVersionMismatchError
@@ -12,6 +12,31 @@ class CorrectionSessionRepository(TenantScopedRepository[CorrectionSession]):
     """校正 Session 的租戶隔離存取層。"""
 
     model = CorrectionSession
+
+    def list_by_api_key(
+        self, page: int, limit: int
+    ) -> tuple[list[CorrectionSession], int]:
+        """分頁列出屬於本 tenant 的所有校正工作階段。
+
+        Returns:
+            (items, total_count) — items 依 created_at 降序，total_count 為未分頁總數。
+        """
+        base_q = select(CorrectionSession).where(
+            CorrectionSession.api_key_id == self.api_key_id
+        )
+        total: int = self.db.execute(
+            select(func.count()).select_from(base_q.subquery())
+        ).scalar_one()
+        items = list(
+            self.db.execute(
+                base_q.order_by(CorrectionSession.created_at.desc())
+                .limit(limit)
+                .offset((page - 1) * limit)
+            )
+            .scalars()
+            .all()
+        )
+        return items, total
 
 
 class CorrectionSegmentRepository:

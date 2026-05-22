@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas.common import PaginationMeta
+
 
 class QualityEvalIssue(BaseModel):
     code: str
@@ -49,6 +51,11 @@ class CorrectionSegmentUpdate(BaseModel):
                 "至少需提供 corrected_text 或 is_skipped 其一"
             )
         return self
+
+
+class CorrectionSessionListData(BaseModel):
+    items: list[CorrectionSessionData]
+    pagination: PaginationMeta
 
 
 class ExportToDatasetRequest(BaseModel):

@@ -48,7 +48,7 @@ describe('<Sidebar />', () => {
     const { Sidebar } = require('@/components/layout/Sidebar');
     render(<Sidebar />);
 
-    expect(screen.getByRole('link', { name: /校正工作台/ })).toHaveAttribute('href', '/finetune/correction');
+    expect(screen.getByRole('link', { name: /校正工作台/ })).toHaveAttribute('href', '/correction');
     expect(screen.getByRole('link', { name: /資料集管理/ })).toHaveAttribute('href', '/finetune/datasets');
     expect(screen.getByRole('link', { name: /訓練管理/ })).toHaveAttribute('href', '/finetune/training');
     expect(screen.getByRole('link', { name: /Hotword/ })).toHaveAttribute('href', '/finetune/hotwords');
