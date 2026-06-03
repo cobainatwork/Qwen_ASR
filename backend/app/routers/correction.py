@@ -166,7 +166,15 @@ def _build_segments_from_transcription(
             for w in timestamps
             if t_start <= float(w.get("start", 0.0)) < t_end and w.get("text")
         ]
-        text = "".join(words_in_turn) if words_in_turn else ""
+        # Skip ghost turns: pyannote sometimes marks SPEAKER turns in silence
+        # ranges (false positive). If no word-level timestamps fall in the
+        # turn window, the turn carries zero ASR content — building a segment
+        # for it just clutters the correction workbench with empty rows.
+        # Evidence: transcription 62, audio [10-20] confirmed silent by user;
+        # pyannote still emitted 3 SPEAKER_02 turns there, all yielding 0 words.
+        if not words_in_turn:
+            continue
+        text = "".join(words_in_turn)
 
         segments.append(
             {

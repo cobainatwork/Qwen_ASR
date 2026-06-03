@@ -478,6 +478,52 @@ def test_overlap_turns_preserved(base_setup, db_session: Session) -> None:
     assert "SPEAKER_01" in labels
 
 
+def test_ghost_turns_with_no_words_filtered(base_setup, db_session: Session) -> None:
+    """Pyannote false-positive turns (speech-like signal but no ASR words) must
+    not produce empty segments. Mirrors real evidence from transcription 62:
+    user confirmed [10-20] is silent but pyannote emitted 3 SPEAKER_02 turns
+    there, all over the 0.5s micro threshold."""
+    client, _, api_key_id, write_token = base_setup
+
+    speakers = [
+        {"speaker": "SPEAKER_00", "start": 0.0, "end": 3.0},     # 真實語音
+        {"speaker": "SPEAKER_02", "start": 12.4, "end": 13.0},   # ghost — 0.6s 過 micro 但無對應字
+        {"speaker": "SPEAKER_02", "start": 15.3, "end": 15.9},   # ghost — 0.6s 過 micro 但無對應字
+        {"speaker": "SPEAKER_00", "start": 20.0, "end": 23.0},   # 真實語音
+    ]
+    timestamps = [
+        {"text": "前段", "start": 1.0, "end": 2.0},
+        {"text": "後段", "start": 21.0, "end": 22.0},
+    ]
+    tx_id = _insert_transcription(
+        db_session,
+        api_key_id,
+        transcript_text="前段後段",
+        speakers=speakers,
+        timestamps=timestamps,
+        duration_sec=23.0,
+    )
+    db_session.flush()
+
+    r = client.post(
+        "/api/v1/correction/sessions",
+        json={"transcription_id": tx_id},
+        headers=_auth(write_token),
+    )
+    assert r.status_code == 200
+    sess_id = r.json()["data"]["id"]
+
+    seg_r = client.get(
+        f"/api/v1/correction/sessions/{sess_id}/segments",
+        headers=_auth(write_token),
+    )
+    segs = seg_r.json()["data"]
+    # 只保留兩個真實 SPEAKER_00 段；兩個 SPEAKER_02 ghost turn 應被過濾
+    assert len(segs) == 2
+    assert {s["speaker_label"] for s in segs} == {"SPEAKER_00"}
+    assert all(s["original_text"] for s in segs)  # 不存在空字串
+
+
 def test_all_micro_turns_fallback_to_whole_audio(base_setup, db_session: Session) -> None:
     """Diarization output entirely composed of micro turns must NOT yield an empty
     session — fallback to single whole-audio segment so the workbench is usable."""
