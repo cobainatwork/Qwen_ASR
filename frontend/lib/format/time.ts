@@ -2,11 +2,15 @@ const sanitize = (v: number) => (Number.isFinite(v) && v > 0 ? v : 0);
 
 export function formatTimestamp(seconds: number): string {
   const s = sanitize(seconds);
-  const totalMin = Math.floor(s / 60);
-  const rem = s - totalMin * 60;
-  const secInt = Math.floor(rem);
-  const tenth = Math.round((rem - secInt) * 10);
-  return `${String(totalMin).padStart(2, '0')}:${String(secInt).padStart(2, '0')}.${tenth}`;
+  // Round to deci-seconds FIRST then split. Avoids carry bug where
+  // 19.99 → secInt=19, tenth=round(9.94)=10 outputting "00:19.10"
+  // instead of "00:20.0". Same fix protects minute carry on 59.99 → 01:00.0.
+  const totalDeci = Math.round(s * 10);
+  const tenth = totalDeci % 10;
+  const totalSec = Math.floor(totalDeci / 10);
+  const totalMin = Math.floor(totalSec / 60);
+  const secInMin = totalSec % 60;
+  return `${String(totalMin).padStart(2, '0')}:${String(secInMin).padStart(2, '0')}.${tenth}`;
 }
 
 export function formatDuration(seconds: number): string {

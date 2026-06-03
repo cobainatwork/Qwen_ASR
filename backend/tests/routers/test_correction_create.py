@@ -476,3 +476,48 @@ def test_overlap_turns_preserved(base_setup, db_session: Session) -> None:
     labels = {s["speaker_label"] for s in segs}
     assert "SPEAKER_00" in labels
     assert "SPEAKER_01" in labels
+
+
+def test_all_micro_turns_fallback_to_whole_audio(base_setup, db_session: Session) -> None:
+    """Diarization output entirely composed of micro turns must NOT yield an empty
+    session — fallback to single whole-audio segment so the workbench is usable."""
+    client, _, api_key_id, write_token = base_setup
+
+    # 全部 turns 都短於 0.5s（pyannote 在 speaker boundary 噪音場景）
+    speakers = [
+        {"speaker": "SPEAKER_00", "start": 0.0, "end": 0.05},
+        {"speaker": "SPEAKER_01", "start": 0.1, "end": 0.20},
+        {"speaker": "SPEAKER_00", "start": 0.3, "end": 0.40},
+    ]
+    timestamps = [
+        {"text": "全段純噪音 turn", "start": 0.0, "end": 5.0},
+    ]
+    tx_id = _insert_transcription(
+        db_session,
+        api_key_id,
+        transcript_text="全段純噪音 turn",
+        speakers=speakers,
+        timestamps=timestamps,
+        duration_sec=5.0,
+    )
+    db_session.flush()
+
+    r = client.post(
+        "/api/v1/correction/sessions",
+        json={"transcription_id": tx_id},
+        headers=_auth(write_token),
+    )
+    assert r.status_code == 200
+    sess_id = r.json()["data"]["id"]
+
+    seg_r = client.get(
+        f"/api/v1/correction/sessions/{sess_id}/segments",
+        headers=_auth(write_token),
+    )
+    segs = seg_r.json()["data"]
+    # Fallback：1 個 segment 涵蓋整個音檔，speaker_label None
+    assert len(segs) == 1
+    assert segs[0]["start_sec"] == 0.0
+    assert segs[0]["end_sec"] == 5.0
+    assert segs[0]["speaker_label"] is None
+    assert segs[0]["original_text"] == "全段純噪音 turn"

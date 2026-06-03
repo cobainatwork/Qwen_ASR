@@ -24,6 +24,17 @@ describe('formatVttTimestamp (00:00:00.000)', () => {
   it('跨小時', () => expect(formatVttTimestamp(3661.5)).toBe('01:01:01.500'));
 });
 
+describe('formatTimestamp carry（regression：tenth 進位至秒/分）', () => {
+  it('19.99 → 00:20.0（tenth 進位，不出現 00:19.10）', () =>
+    expect(formatTimestamp(19.99)).toBe('00:20.0'));
+  it('19.994 → 00:19.9（不四捨入到 secInt）', () =>
+    expect(formatTimestamp(19.94)).toBe('00:19.9'));
+  it('59.99 → 01:00.0（tenth + secInt 雙進位）', () =>
+    expect(formatTimestamp(59.99)).toBe('01:00.0'));
+  it('59.94 → 00:59.9（無進位）', () =>
+    expect(formatTimestamp(59.94)).toBe('00:59.9'));
+});
+
 describe('formatTimestamp 非有限數', () => {
   it('NaN → 00:00.0', () => expect(formatTimestamp(NaN)).toBe('00:00.0'));
   it('Infinity → 00:00.0', () => expect(formatTimestamp(Infinity)).toBe('00:00.0'));

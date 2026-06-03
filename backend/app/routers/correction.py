@@ -176,6 +176,20 @@ def _build_segments_from_transcription(
                 "speaker_label": speaker,
             }
         )
+
+    # 5. Fallback: if filter+merge eliminated all turns (entire diarization
+    # output was micro turns), still produce a single whole-audio segment so
+    # the user has a workbench to edit instead of an empty session.
+    if not segments:
+        duration = transcription.duration_sec or 0.0
+        return [
+            {
+                "start_sec": 0.0,
+                "end_sec": duration,
+                "text": full_text,
+                "speaker_label": None,
+            }
+        ]
     return segments
 
 
