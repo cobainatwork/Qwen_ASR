@@ -39,6 +39,12 @@ from app.services.correction.quality_evaluator import evaluate_session_quality
 
 router = APIRouter(prefix="/api/v1/correction", tags=["correction"])
 
+# Pyannote diarization raw output contains micro turns (< 0.1 s) at speaker
+# boundaries and sparse gaps between same-speaker turns. These constants
+# control how _build_segments_from_transcription cleans the raw data.
+_MIN_TURN_DURATION_SEC = 0.5   # turns shorter than this are discarded
+_MERGE_GAP_SEC = 0.3           # adjacent same-speaker turns within this gap are merged
+
 
 def _get_audio_file_id(db: Session, transcription_id: int, api_key_id: int) -> int | None:
     """Fetch the audio_file.id whose transcription_id matches the given transcription.
@@ -89,13 +95,19 @@ def _build_segments_from_transcription(
 ) -> list[dict[str, Any]]:
     """Decompose transcription JSONB into segment dicts for bulk_create.
 
-    Strategy:
-    - If `speakers` is non-empty: for each speaker turn {speaker, start, end},
-      collect all word-level timestamps whose start falls in [turn.start, turn.end),
-      concatenate their `text` fields, use turn timing for start_sec/end_sec,
-      and carry the speaker label.
-    - If `speakers` is empty/None: produce one segment spanning the entire
-      transcription, using `transcript_text` as `text`.
+    Pyannote raw output contains micro turns (noise at speaker boundaries),
+    out-of-order turns, and small gaps between same-speaker turns.  This
+    function normalises the raw data before creating CorrectionSegments:
+
+    1. Sort all turns by start_sec.
+    2. Discard turns shorter than _MIN_TURN_DURATION_SEC (micro turns).
+    3. Merge adjacent same-speaker turns whose gap < _MERGE_GAP_SEC.
+    4. Overlap turns (two speakers in the same time window) are preserved
+       as independent segments — no attempt is made to resolve them.
+    5. Aggregate word-level timestamps in [turn_start, turn_end) for text.
+
+    If speakers is empty/None: return one segment spanning the full audio
+    using transcript_text.
     """
     speakers: list[dict[str, Any]] = transcription.speakers or []
     timestamps: list[dict[str, Any]] = transcription.timestamps or []
@@ -111,18 +123,48 @@ def _build_segments_from_transcription(
             }
         ]
 
+    # 1. Sort by start_sec
+    sorted_turns = sorted(
+        (
+            {
+                "start": float(t.get("start", 0.0)),
+                "end": float(t.get("end", 0.0)),
+                "speaker": str(t.get("speaker", "")) or None,
+            }
+            for t in speakers
+        ),
+        key=lambda x: x["start"],
+    )
+
+    # 2. Filter micro turns
+    filtered = [
+        t for t in sorted_turns
+        if (t["end"] - t["start"]) >= _MIN_TURN_DURATION_SEC
+    ]
+
+    # 3. Merge adjacent same-speaker turns with a small gap
+    merged: list[dict[str, Any]] = []
+    for turn in filtered:
+        if (
+            merged
+            and merged[-1]["speaker"] == turn["speaker"]
+            and (turn["start"] - merged[-1]["end"]) < _MERGE_GAP_SEC
+        ):
+            merged[-1]["end"] = turn["end"]
+        else:
+            merged.append(dict(turn))
+
+    # 4. Build segment dicts with aggregated word text
     segments: list[dict[str, Any]] = []
-    for turn in speakers:
-        t_start: float = float(turn.get("start", 0.0))
-        t_end: float = float(turn.get("end", t_start))
-        speaker: str = str(turn.get("speaker", ""))
+    for turn in merged:
+        t_start: float = turn["start"]
+        t_end: float = turn["end"]
+        speaker = turn["speaker"]
 
         words_in_turn = [
             w["text"]
             for w in timestamps
-            if float(w.get("start", 0.0)) >= t_start
-            and float(w.get("start", 0.0)) < t_end
-            and w.get("text")
+            if t_start <= float(w.get("start", 0.0)) < t_end and w.get("text")
         ]
         text = "".join(words_in_turn) if words_in_turn else ""
 
@@ -131,7 +173,7 @@ def _build_segments_from_transcription(
                 "start_sec": t_start,
                 "end_sec": t_end,
                 "text": text,
-                "speaker_label": speaker if speaker else None,
+                "speaker_label": speaker,
             }
         )
     return segments

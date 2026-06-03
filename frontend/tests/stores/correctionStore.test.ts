@@ -27,13 +27,19 @@ describe('correctionStore', () => {
     expect(useCorrectionStore.getState().saveStates.get(1)).toBe('saved');
   });
 
-  it('setLoopRange 設定/清除', () => {
+  it('初始 loopMode 為 off（防止 micro-segment 播放破裂）', () => {
+    expect(useCorrectionStore.getState().loopMode).toBe('off');
+  });
+
+  it('setLoopRange 設定/清除：清除後恢復 segment（而非 off）', () => {
     const { setLoopRange } = useCorrectionStore.getState();
     setLoopRange({ start: 1.0, end: 2.0 });
     expect(useCorrectionStore.getState().loopRange).toEqual({ start: 1.0, end: 2.0 });
     expect(useCorrectionStore.getState().loopMode).toBe('range');
     setLoopRange(null);
     expect(useCorrectionStore.getState().loopRange).toBeNull();
+    // Clearing a range restores 'segment' (explicit cascade in setLoopRange),
+    // not 'off' — 'off' is only the cold-start default.
     expect(useCorrectionStore.getState().loopMode).toBe('segment');
   });
 

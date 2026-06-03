@@ -302,3 +302,177 @@ def test_create_session_scope_reject(base_setup, db_session: Session) -> None:
         headers=_auth(read_token),
     )
     assert r.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# _build_segments_from_transcription unit-level tests (via create endpoint)
+# ---------------------------------------------------------------------------
+
+
+def test_micro_turns_filtered(base_setup, db_session: Session) -> None:
+    """Speaker turns shorter than 0.5 s must be discarded."""
+    client, _, api_key_id, write_token = base_setup
+
+    speakers = [
+        {"speaker": "SPEAKER_00", "start": 0.0, "end": 0.05},   # 0.05 s — micro
+        {"speaker": "SPEAKER_01", "start": 0.1, "end": 0.15},   # 0.05 s — micro
+        {"speaker": "SPEAKER_00", "start": 1.0, "end": 6.0},    # 5.0 s — keep
+    ]
+    timestamps = [
+        {"text": "你好", "start": 1.5, "end": 2.0},
+    ]
+    tx_id = _insert_transcription(
+        db_session,
+        api_key_id,
+        transcript_text="你好",
+        speakers=speakers,
+        timestamps=timestamps,
+        duration_sec=6.0,
+    )
+    db_session.flush()
+
+    r = client.post(
+        "/api/v1/correction/sessions",
+        json={"transcription_id": tx_id},
+        headers=_auth(write_token),
+    )
+    assert r.status_code == 200
+    sess_id = r.json()["data"]["id"]
+
+    seg_r = client.get(
+        f"/api/v1/correction/sessions/{sess_id}/segments",
+        headers=_auth(write_token),
+    )
+    segs = seg_r.json()["data"]
+    # Only the 5-second turn should survive
+    assert len(segs) == 1
+    assert segs[0]["speaker_label"] == "SPEAKER_00"
+    assert segs[0]["start_sec"] == 1.0
+    assert segs[0]["end_sec"] == 6.0
+
+
+def test_adjacent_same_speaker_merged(base_setup, db_session: Session) -> None:
+    """Two same-speaker turns with gap < 0.3 s must be merged into one segment."""
+    client, _, api_key_id, write_token = base_setup
+
+    speakers = [
+        {"speaker": "SPEAKER_00", "start": 0.0, "end": 3.0},
+        {"speaker": "SPEAKER_00", "start": 3.1, "end": 6.0},  # gap = 0.1 s → merge
+    ]
+    timestamps = [
+        {"text": "A", "start": 0.5, "end": 1.0},
+        {"text": "B", "start": 3.5, "end": 4.0},
+    ]
+    tx_id = _insert_transcription(
+        db_session,
+        api_key_id,
+        transcript_text="AB",
+        speakers=speakers,
+        timestamps=timestamps,
+        duration_sec=6.0,
+    )
+    db_session.flush()
+
+    r = client.post(
+        "/api/v1/correction/sessions",
+        json={"transcription_id": tx_id},
+        headers=_auth(write_token),
+    )
+    assert r.status_code == 200
+    sess_id = r.json()["data"]["id"]
+
+    seg_r = client.get(
+        f"/api/v1/correction/sessions/{sess_id}/segments",
+        headers=_auth(write_token),
+    )
+    segs = seg_r.json()["data"]
+    assert len(segs) == 1
+    assert segs[0]["start_sec"] == 0.0
+    assert segs[0]["end_sec"] == 6.0
+    assert segs[0]["speaker_label"] == "SPEAKER_00"
+
+
+def test_sorted_by_start(base_setup, db_session: Session) -> None:
+    """Out-of-order speaker turns must be output in start_sec ascending order."""
+    client, _, api_key_id, write_token = base_setup
+
+    # Deliberately reversed order
+    speakers = [
+        {"speaker": "SPEAKER_01", "start": 5.0, "end": 10.0},
+        {"speaker": "SPEAKER_00", "start": 0.0, "end": 4.5},
+    ]
+    timestamps = [
+        {"text": "first", "start": 0.5, "end": 1.0},
+        {"text": "second", "start": 5.5, "end": 6.0},
+    ]
+    tx_id = _insert_transcription(
+        db_session,
+        api_key_id,
+        transcript_text="firstsecond",
+        speakers=speakers,
+        timestamps=timestamps,
+        duration_sec=10.0,
+    )
+    db_session.flush()
+
+    r = client.post(
+        "/api/v1/correction/sessions",
+        json={"transcription_id": tx_id},
+        headers=_auth(write_token),
+    )
+    assert r.status_code == 200
+    sess_id = r.json()["data"]["id"]
+
+    seg_r = client.get(
+        f"/api/v1/correction/sessions/{sess_id}/segments",
+        headers=_auth(write_token),
+    )
+    segs = seg_r.json()["data"]
+    assert len(segs) == 2
+    assert segs[0]["start_sec"] == 0.0
+    assert segs[0]["speaker_label"] == "SPEAKER_00"
+    assert segs[1]["start_sec"] == 5.0
+    assert segs[1]["speaker_label"] == "SPEAKER_01"
+
+
+def test_overlap_turns_preserved(base_setup, db_session: Session) -> None:
+    """Two speakers with overlapping time windows must both be preserved as segments."""
+    client, _, api_key_id, write_token = base_setup
+
+    # Overlap: both speakers active in [1.0, 4.0)
+    speakers = [
+        {"speaker": "SPEAKER_00", "start": 0.0, "end": 5.0},
+        {"speaker": "SPEAKER_01", "start": 1.0, "end": 4.0},
+    ]
+    timestamps = [
+        {"text": "X", "start": 0.5, "end": 1.0},
+        {"text": "Y", "start": 1.5, "end": 2.0},
+    ]
+    tx_id = _insert_transcription(
+        db_session,
+        api_key_id,
+        transcript_text="XY",
+        speakers=speakers,
+        timestamps=timestamps,
+        duration_sec=5.0,
+    )
+    db_session.flush()
+
+    r = client.post(
+        "/api/v1/correction/sessions",
+        json={"transcription_id": tx_id},
+        headers=_auth(write_token),
+    )
+    assert r.status_code == 200
+    sess_id = r.json()["data"]["id"]
+
+    seg_r = client.get(
+        f"/api/v1/correction/sessions/{sess_id}/segments",
+        headers=_auth(write_token),
+    )
+    segs = seg_r.json()["data"]
+    # Both overlap turns preserved (different speakers — no merge)
+    assert len(segs) == 2
+    labels = {s["speaker_label"] for s in segs}
+    assert "SPEAKER_00" in labels
+    assert "SPEAKER_01" in labels

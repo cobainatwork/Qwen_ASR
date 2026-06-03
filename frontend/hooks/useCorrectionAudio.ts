@@ -95,17 +95,31 @@ export function useCorrectionAudio({ audioUrl, containerRef, segments }: Options
         }
       } else if (loopMode === 'segment' && focusedSegmentId != null) {
         const seg = segments.find((s) => s.id === focusedSegmentId);
-        if (seg && t >= seg.end_sec) {
-          setTimeCallCountRef.current += 1;
-          if (setTimeCallCountRef.current % 5 === 1) {
-            console.log('[CorrAudio] segment loop seek (segment)', {
-              callCount: setTimeCallCountRef.current,
-              from: t.toFixed(3),
-              to: seg.start_sec.toFixed(3),
-              segId: seg.id,
-            });
+        if (seg) {
+          const segDuration = seg.end_sec - seg.start_sec;
+          if (segDuration < 0.5) {
+            // Skip loop for micro segments to avoid playback thrashing.
+            // Log at most once per 100 audioprocess frames to avoid spam.
+            setTimeCallCountRef.current += 1;
+            if (setTimeCallCountRef.current % 100 === 1) {
+              console.log('[CorrAudio] segment loop skipped due to short duration', {
+                segId: seg.id,
+                duration: segDuration.toFixed(3),
+                callCount: setTimeCallCountRef.current,
+              });
+            }
+          } else if (t >= seg.end_sec) {
+            setTimeCallCountRef.current += 1;
+            if (setTimeCallCountRef.current % 5 === 1) {
+              console.log('[CorrAudio] segment loop seek (segment)', {
+                callCount: setTimeCallCountRef.current,
+                from: t.toFixed(3),
+                to: seg.start_sec.toFixed(3),
+                segId: seg.id,
+              });
+            }
+            ws.setTime(seg.start_sec);
           }
-          ws.setTime(seg.start_sec);
         }
       }
     });

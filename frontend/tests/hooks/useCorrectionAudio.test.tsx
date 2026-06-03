@@ -182,3 +182,100 @@ describe('useCorrectionAudio — isPlaying', () => {
     expect(result.current.isPlaying).toBe(false);
   });
 });
+
+// ── Test 4: segment loop guard ────────────────────────────────────────────────
+
+// Helper: emit audioprocess by calling the registered handler with a mocked
+// getCurrentTime. Returns the registered audioprocess callback directly so
+// tests can invoke it multiple times.
+function getAudioprocessHandler(ws: FakeWaveSurfer): (() => void) | undefined {
+  const calls = (ws.on as jest.Mock).mock.calls as [string, () => void][];
+  const entry = calls.find(([e]) => e === 'audioprocess');
+  return entry?.[1];
+}
+
+import { useCorrectionStore } from '@/stores/correctionStore';
+
+describe('useCorrectionAudio — segment loop guard', () => {
+  beforeEach(() => {
+    // Reset store to default state before each test.
+    (useCorrectionStore as any).setState(
+      (useCorrectionStore as any).getInitialState(),
+      true,
+    );
+  });
+
+  it('does NOT call ws.setTime for a micro segment (< 0.5 s) even when t >= end_sec', async () => {
+    const microSeg: CorrectionSegment = {
+      id: 99,
+      segment_index: 0,
+      start_sec: 13.885,
+      end_sec: 13.919,   // duration = 0.034 s — micro
+      original_text: '',
+      corrected_text: null,
+      speaker_label: null,
+      is_skipped: false,
+      version: 1,
+      session_id: 1,
+      updated_at: '',
+    } as any;
+
+    const containerRef = makeContainerRef();
+    renderHook(
+      () => useCorrectionAudio({ audioUrl: '/api/v1/audio/1/stream', containerRef, segments: [microSeg] }),
+      { wrapper },
+    );
+    await act(async () => {});
+    const ws = getLastWs();
+
+    // Set store state: loopMode=segment, focused on micro segment.
+    act(() => {
+      useCorrectionStore.getState().setLoopMode('segment');
+      useCorrectionStore.getState().setFocused(microSeg.id);
+    });
+
+    // Simulate audioprocess at t=13.930 (past end_sec).
+    (ws.getCurrentTime as jest.Mock).mockReturnValue(13.93);
+    const handler = getAudioprocessHandler(ws);
+    act(() => { handler?.(); });
+
+    // ws.setTime must NOT be called — micro segment loop guard.
+    expect(ws.setTime).not.toHaveBeenCalled();
+  });
+
+  it('calls ws.setTime(start_sec) for a normal segment (>= 0.5 s) when t >= end_sec', async () => {
+    const normalSeg: CorrectionSegment = {
+      id: 42,
+      segment_index: 0,
+      start_sec: 10.0,
+      end_sec: 15.0,   // duration = 5.0 s — normal
+      original_text: 'hello',
+      corrected_text: null,
+      speaker_label: 'S0',
+      is_skipped: false,
+      version: 1,
+      session_id: 1,
+      updated_at: '',
+    } as any;
+
+    const containerRef = makeContainerRef();
+    renderHook(
+      () => useCorrectionAudio({ audioUrl: '/api/v1/audio/1/stream', containerRef, segments: [normalSeg] }),
+      { wrapper },
+    );
+    await act(async () => {});
+    const ws = getLastWs();
+
+    act(() => {
+      useCorrectionStore.getState().setLoopMode('segment');
+      useCorrectionStore.getState().setFocused(normalSeg.id);
+    });
+
+    // Simulate audioprocess at t=15.1 (past end_sec).
+    (ws.getCurrentTime as jest.Mock).mockReturnValue(15.1);
+    const handler = getAudioprocessHandler(ws);
+    act(() => { handler?.(); });
+
+    expect(ws.setTime).toHaveBeenCalledWith(normalSeg.start_sec);
+  });
+});

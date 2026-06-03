@@ -42,7 +42,7 @@ const INITIAL_STATE: CorrectionState = {
   focusedSegmentId: null,
   playbackTime: 0,
   playbackRate: 1,
-  loopMode: 'segment',
+  loopMode: 'off',
   loopRange: null,
   focusMode: false,
   saveStates: new Map(),
